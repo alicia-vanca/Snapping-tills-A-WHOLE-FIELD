@@ -1,8 +1,10 @@
-name = "Snapping tills A WHOLE FIELD"
+version = "1.1.9_00"
+name = "Snapping tills A WHOLE FIELD v" .. version
 description = [[Aligns plowing to the grid.
 
-LeftShift + RightMouseClick: Launch auto tilling on tile.
-Key "L": Toggle snap modes, off/optimized/4x4/3x3/2x2/hexagon.
+LeftShift + RightClick: Launch auto tilling on a tile.
+LeftShift + DoubleRightClick: Launch auto tilling on multi tiles.
+Key "L": Toggle snap modes: off / optimized / 4x4 / 3x3 / 2x2 / hexagon.
 Optimized mode checks for an adjacent soil tile, if not found adjacent soil tile then uses 4x4 else uses 3x3. You can bind key in configure mod.
 
 Important:
@@ -10,12 +12,11 @@ Important:
     "Geometric Placement" must be OFF in game (key B -> "off")
     or disabled "snap till" in options (key B -> disable "snap till")
 
-Сontroller support.
+Сontroller support (auto swich tiles hasn't been tested)
 Compatible with Geometric Placement
 Compatible with ActionQueue Reborn (ActionQueue RB2/RB3)
 ]]
 author = "surg | modified by VanCa"
-version = "1.1.9_00"
 api_version_dst = 10
 priority = -101 -- -101 for compatible with "No Release Deployables v2" mod
 icon_atlas = "modicon.xml"

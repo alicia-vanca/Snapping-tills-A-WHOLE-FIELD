@@ -317,29 +317,26 @@ AddComponentPostInit(
         end
 
         self.OnRightClick = function(self, down)
-            -- 250318 VanCa: only process mouse-up event to prevent double process per click
-            -- and compatible with ActionQueuer RB3
-            if not down then
-                -- Right click release
+            local autotilldown = false
 
-                local autotilldown = false
+            if _G.TheInput:IsKeyDown(_G.KEY_LSHIFT) then
+                autotilldown = true
+            end
 
-                if _G.TheInput:IsKeyDown(_G.KEY_LSHIFT) then
-                    autotilldown = true
-                end
+            local act = self:GetRightMouseAction()
 
-                local act = self:GetRightMouseAction()
-
-                if _G.ThePlayer.components.snaptiller.snapmode ~= 0 and act then
-                    -- Wormwood planting
-                    if
-                        act.action == _G.ACTIONS.DEPLOY and act.invobject:HasTag("deployedfarmplant") and
-                            not is_on_geometricplacement
-                     then
+            if _G.ThePlayer.components.snaptiller.snapmode ~= 0 and act then
+                -- Wormwood planting
+                if
+                    act.action == _G.ACTIONS.DEPLOY and act.invobject:HasTag("deployedfarmplant") and
+                        not is_on_geometricplacement
+                 then
+                    -- 250318 VanCa: only process mouse-up event to prevent double process per click
+                    -- and compatible with ActionQueuer RB3
+                    if not down then
                         if autotilldown then
                             -- LShift + Single right click
                             self.inst.components.snaptiller:StartAutoDeployAtPoint()
-                            return
                         else
                             -- Single right click
                             local playercontroller = self.inst.components.playercontroller
@@ -376,19 +373,19 @@ AddComponentPostInit(
                                     )
                                 end
                             end
-                            return
                         end
                     end
+                    return
+                end
 
-                    -- Tilling
-                    if
-                        act.action == _G.ACTIONS.TILL and
-                            (not _G.ACTIONS.TILL.tile_placer or not is_on_geometricplacement)
-                     then
+                -- Tilling
+                if act.action == _G.ACTIONS.TILL and (not _G.ACTIONS.TILL.tile_placer or not is_on_geometricplacement) then
+                    -- 250318 VanCa: only process mouse-up event to prevent double process per click
+                    -- and compatible with ActionQueuer RB3
+                    if not down then
                         if autotilldown then
                             -- LShift + Single right click
                             self.inst.components.snaptiller:StartAutoTillAtPoint()
-                            return
                         else
                             -- Single right click
                             local playercontroller = self.inst.components.playercontroller
@@ -427,18 +424,15 @@ AddComponentPostInit(
                                     )
                                 end
                             end
-                            return
                         end
                     end
+                    return
                 end
-
-                -- Snap mode == 0 : Off
-                -- Original right click release
-                original_OnRightClick(self, down)
-            elseif not self.inst.components.snaptiller.queue_manager.action_thread then
-                -- Original right click press down
-                original_OnRightClick(self, down)
             end
+
+            -- Snap mode == 0 : Off
+            -- Original right click
+            original_OnRightClick(self, down)
         end
 
         self.DoControllerAltActionButton = function(self)

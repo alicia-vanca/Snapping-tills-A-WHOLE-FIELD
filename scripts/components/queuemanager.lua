@@ -1,4 +1,4 @@
--- 250317 VanCa: Add adjacent farm tiles to the selected list for tilling / planting
+-- 250317 VanCa: Add this file to manage tilling / planting on multi tiles
 -- Reference: Action Queue RB3, Bird Painting Scroll
 
 function table_print(tt, indent, done)
