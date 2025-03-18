@@ -1,4 +1,4 @@
-name = "Snapping tills"
+name = "Snapping tills A WHOLE FIELD"
 description = [[Aligns plowing to the grid.
 
 LeftShift + RightMouseClick: Launch auto tilling on tile.
@@ -14,8 +14,8 @@ Important:
 Compatible with Geometric Placement
 Compatible with ActionQueue Reborn (ActionQueue RB2/RB3)
 ]]
-author = "surg"
-version = "1.1.9"
+author = "surg | modified by VanCa"
+version = "1.1.9_00"
 api_version_dst = 10
 priority = -101 -- -101 for compatible with "No Release Deployables v2" mod
 icon_atlas = "modicon.xml"

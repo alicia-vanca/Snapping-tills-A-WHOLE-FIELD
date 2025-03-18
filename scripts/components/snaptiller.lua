@@ -1,3 +1,6 @@
+-- 250617 VanCa: Add QueueManager to handle farm tiles queue
+local QueueManager = require("components/queuemanager")
+
 local TILESNAPS =
 {
     MAP_2x2 = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}},
@@ -63,11 +66,16 @@ local HEADSNAPS =
 }
 
 local function DoActionTill(self, pos)
+    DebugPrint("-------------------------------------")
+    DebugPrint("DoActionTill pos:", pos)
     local cantill = true
     local x, y, z = pos:Get()
     local item = self.inst.replica.inventory and self.inst.replica.inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
 
-    if not item then return false end
+    if not item then 
+		DebugPrint("not item")
+		return false 
+	end
 
     if self.isquagmire then
         cantill = TheWorld.Map:CanTillSoilAtPoint(pos)
@@ -76,6 +84,7 @@ local function DoActionTill(self, pos)
     end
 
     if cantill then
+		DebugPrint("cantill")
         local playercontroller = self.inst.components.playercontroller
         local act = BufferedAction(self.inst, nil, ACTIONS.TILL, item, pos)
 
@@ -99,30 +108,37 @@ local function DoActionTill(self, pos)
         until not (self.inst.sg and self.inst.sg:HasStateTag("moving")) and not self.inst:HasTag("moving")
               and self.inst:HasTag("idle") and not self.inst.components.playercontroller:IsDoingOrWorking()
     end
+	DebugPrint("end")
 
     return true
 end
 
 local function DoActionDeploy(self, pos)
+    DebugPrint("-------------------------------------")
+    DebugPrint("DoActionDeploy pos: ", pos)
     local x, y, z = pos:Get()
     local item = self.inst.replica.inventory and self.inst.replica.inventory:GetActiveItem()
 
     if not item then return false end
 
     if TheWorld.Map:CanTillSoilAtPoint(x, y, z, true) then
+		DebugPrint("CanTillSoilAtPoint")
         local playercontroller = self.inst.components.playercontroller
         local act = BufferedAction(self.inst, nil, ACTIONS.DEPLOY, item, pos)
 
         if playercontroller.ismastersim then
+			DebugPrint("playercontroller.ismastersim")
             self.inst.components.combat:SetTarget(nil)
             playercontroller:DoAction(act)
         else
             if playercontroller.locomotor then
                 act.preview_cb = function()
+					DebugPrint("locomotor SendRPCToServer")
                     SendRPCToServer(RPC.RightClick, ACTIONS.DEPLOY.code, pos.x, pos.z, nil, nil, true)
                 end
                 playercontroller:DoAction(act)
             else
+				DebugPrint("SendRPCToServer")
                 SendRPCToServer(RPC.RightClick, ACTIONS.DEPLOY.code, pos.x, pos.z, nil, nil, true)
             end
         end
@@ -143,6 +159,7 @@ local SnapTiller = Class(function(self, inst)
     self.isquagmire = false
     self.actionthread = nil
     self.snaplistaction = nil
+	self.queue_manager = QueueManager(self.inst)
 end)
 
 function SnapTiller:HasAdjacentSoilTile(pos)
@@ -302,107 +319,156 @@ function SnapTiller:GetSnap(pos)
     return pos
 end
 
+function SnapTiller:StartAutoTillTile(tile)
+	DebugPrint("StartAutoTillTile(tile) tile: ", tile)
+	
+	local target_pos = tile:GetPosition()
+	DebugPrint("tile:GetPosition(): ", target_pos)
+
+	local tilex, tiley = TheWorld.Map:GetTileCoordsAtPoint(target_pos.x, target_pos.y, target_pos.z)
+	DebugPrint("tilex: ", tilex, "tiley: ", tiley)
+	local index = 1
+
+	self.snaplistaction = self:GetSnapListOnTile(tilex, tiley, TheCamera.heading)
+
+	-- Filter invalid snaps
+	for i = #self.snaplistaction, 1, -1 do
+		local snap = self.snaplistaction[i]
+		local ents = TheSim:FindEntities(snap[1], 0, snap[2], 0.005, {"soil"})
+		local flagremove = false
+
+		for _, v in pairs(ents) do
+			if not v:HasTag("NOCLICK") then
+				flagremove = true
+				break
+			end
+		end 
+
+		if flagremove then table.remove(self.snaplistaction, i) end
+	end
+
+	-- Process all snaps for this tile
+	while self.inst:IsValid() do
+		local coord = self.snaplistaction[index]
+
+		if coord == nil then break end
+		if not DoActionTill(self, Point(coord[1], 0, coord[2])) then break end
+
+		index = index + 1
+	end
+    return true
+end
+
+function SnapTiller:StartAutoTillAtPoint()
+    DebugPrint("-------------------------------------")
+    DebugPrint("StartAutoTillAtPoint")
+    local manager = self.queue_manager	
+	local input_pos = self.inst:GetPosition()
+	if not TheInput:ControllerAttached() then
+		input_pos = TheInput:GetWorldPosition()
+	end
+	
+	local current_time = GetTime()
+	if manager.last_click.time and (current_time - manager.last_click.time) <= manager.double_click_speed then
+		DebugPrint("Double click")
+		manager:TryAddToQueue(input_pos, true)
+	else
+		DebugPrint("Single click / First click of a Double click")
+		manager:TryAddToQueue(input_pos, false)
+	end
+
+    if not manager.action_thread then
+		DebugPrint("First call")
+        -- First call: Initialize and start processing
+        manager.last_click.time = current_time
+		return manager:StartProcessThread(function(tile)
+				-- Existing code that till a single tile
+				DebugPrint("Handle single tile")
+				self:StartAutoTillTile(tile)  -- Synchronous processing
+			end)
+    end
+end
+
+function SnapTiller:StartAutoDeployTile(tile)
+    DebugPrint("-------------------------------------")
+    DebugPrint("StartAutoDeployTile")
+	local target_pos = tile:GetPosition()
+	DebugPrint("tile:GetPosition(): ", target_pos)
+
+	local tilex, tiley = TheWorld.Map:GetTileCoordsAtPoint(target_pos.x, target_pos.y, target_pos.z)
+	local index = 1
+
+	self.snaplistaction = self:GetSnapListOnTile(tilex, tiley, TheCamera.heading)
+
+	-- 250318 VanCa: Remove this part to plant in narrowed spaces with Wormwood
+	-- for i = #self.snaplistaction, 1, -1 do
+		-- local snap = self.snaplistaction[i]
+		-- local ents = TheSim:FindEntities(snap[1], 0, snap[2], 0.005, {"soil"})
+		-- local flagremove = false
+
+		-- for _, v in pairs(ents) do
+			-- if not v:HasTag("NOCLICK") then
+				-- flagremove = true
+				-- break
+			-- end
+		-- end 
+
+		-- if flagremove then table.remove(self.snaplistaction, i) end
+	-- end
+
+	while self.inst:IsValid() do
+		local coord = self.snaplistaction[index]
+
+		if coord == nil then break end
+		if not DoActionDeploy(self, Point(coord[1], 0, coord[2])) then break end
+
+		index = index + 1
+	end
+    return true
+end
+
+function SnapTiller:StartAutoDeployAtPoint()
+    DebugPrint("-------------------------------------")
+    DebugPrint("StartAutoDeployAtPoint")
+    local manager = self.queue_manager	
+	local input_pos = self.inst:GetPosition()
+	if not TheInput:ControllerAttached() then
+		input_pos = TheInput:GetWorldPosition()
+	end
+	
+	local current_time = GetTime()
+	if manager.last_click.time and (current_time - manager.last_click.time) <= manager.double_click_speed then
+		DebugPrint("Double click")
+		manager:TryAddToQueue(input_pos, true)
+	else
+		DebugPrint("Single click / First click of a Double click")
+		manager:TryAddToQueue(input_pos, false)
+	end
+
+    if not manager.action_thread then
+		DebugPrint("First call")
+        -- First call: Initialize and start processing
+        manager.last_click.time = current_time
+		return manager:StartProcessThread(function(tile)
+				-- Existing code that till a single tile
+				DebugPrint("Handle single tile")
+				self:StartAutoDeployTile(tile)  -- Synchronous processing
+			end)
+    end
+end
+
 function SnapTiller:ClearActionThread()
+    DebugPrint("-------------------------------------")
+    DebugPrint("SnapTiller:ClearActionThread")
     if self.actionthread then
         KillThreadsWithID("snaptillertactionhread")
         self.actionthread:SetList(nil)
         self.actionthread = nil
         self.snaplistaction = nil
     end
-end
-
-function SnapTiller:StartAutoTillTile()
-    if self.actionthread then return false end
-
-    self.actionthread = StartThread(function()
-        self.inst:ClearBufferedAction()
-
-        local inputpos = self.inst:GetPosition()
-
-        if not TheInput:ControllerAttached() then
-            inputpos = TheInput:GetWorldPosition()
-        end
-
-        local tilex, tiley = TheWorld.Map:GetTileCoordsAtPoint(inputpos.x, inputpos.y, inputpos.z)
-        local index = 1
-
-        self.snaplistaction = self:GetSnapListOnTile(tilex, tiley, TheCamera.heading)
-
-        for i = #self.snaplistaction, 1, -1 do
-            local snap = self.snaplistaction[i]
-            local ents = TheSim:FindEntities(snap[1], 0, snap[2], 0.005, {"soil"})
-            local flagremove = false
-
-            for _, v in pairs(ents) do
-                if not v:HasTag("NOCLICK") then
-                    flagremove = true
-                    break
-                end
-            end 
-
-            if flagremove then table.remove(self.snaplistaction, i) end
-        end
-
-        while self.inst:IsValid() do
-            local coord = self.snaplistaction[index]
-
-            if coord == nil then break end
-            if not DoActionTill(self, Point(coord[1], 0, coord[2])) then break end
-
-            index = index + 1
-        end
-
-        self:ClearActionThread()
-    end, "snaptillertactionhread")
-
-    return true
-end
-
-function SnapTiller:StartAutoDeployTile()
-    if self.actionthread then return false end
-
-    self.actionthread = StartThread(function()
-        self.inst:ClearBufferedAction()
-
-        local inputpos = self.inst:GetPosition()
-
-        if not TheInput:ControllerAttached() then
-            inputpos = TheInput:GetWorldPosition()
-        end
-
-        local tilex, tiley = TheWorld.Map:GetTileCoordsAtPoint(inputpos.x, inputpos.y, inputpos.z)
-        local index = 1
-
-        self.snaplistaction = self:GetSnapListOnTile(tilex, tiley, TheCamera.heading)
-
-        for i = #self.snaplistaction, 1, -1 do
-            local snap = self.snaplistaction[i]
-            local ents = TheSim:FindEntities(snap[1], 0, snap[2], 0.005, {"soil"})
-            local flagremove = false
-
-            for _, v in pairs(ents) do
-                if not v:HasTag("NOCLICK") then
-                    flagremove = true
-                    break
-                end
-            end 
-
-            if flagremove then table.remove(self.snaplistaction, i) end
-        end
-
-        while self.inst:IsValid() do
-            local coord = self.snaplistaction[index]
-
-            if coord == nil then break end
-            if not DoActionDeploy(self, Point(coord[1], 0, coord[2])) then break end
-
-            index = index + 1
-        end
-
-        self:ClearActionThread()
-    end, "snaptillertactionhread")
-
-    return true
+    if self.queue_manager then
+        self.queue_manager:ClearThread()
+    end
 end
 
 SnapTiller.OnRemoveEntity = SnapTiller.ClearActionThread
