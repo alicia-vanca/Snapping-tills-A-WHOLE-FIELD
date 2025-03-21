@@ -31,7 +31,7 @@ function to_string(tbl)
         return tostring(tbl) .. "(" .. type(tbl) .. ")"
     end
 end
-DebugPrint = function(...)
+DebugPrint = false and function(...)
     local msg = "[Snap tillss]"
     for i = 1, arg.n do
         msg = msg .. " " .. to_string(arg[i])
@@ -50,7 +50,7 @@ local QueueManager =
         self.action_delay = FRAMES * 3
         self.work_delay = FRAMES * 6
         self.last_click = {time = nil}
-        self.double_click_speed = 0.4
+        self.double_click_speed = 0.5
         DebugPrint("QueueManager initialize")
     end
 )

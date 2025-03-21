@@ -1,3 +1,5 @@
+--250321 VanCa: Add intercropping handling
+
 Assets = {
     Asset("ANIM", "anim/snaptillplacer.zip")
 }
@@ -27,7 +29,14 @@ _G.STRINGS.SNAPPINGTILLS = {
     SNAP_MODE_4x4 = "Snapping tills: mode 4x4",
     SNAP_MODE_3x3 = "Snapping tills: mode 3x3",
     SNAP_MODE_2x2 = "Snapping tills: mode 2x2",
-    SNAP_MODE_HEXAGON = "Snapping tills: mode hexagon"
+    SNAP_MODE_HEXAGON = "Snapping tills: mode hexagon",
+    ACTION_CHANGE_INTERCROPPING_MODE = "Toggle intercropping mode",
+    INTERCROPPING = {
+        [1] = "Intercropping: Off",
+        [2] = "Intercropping: 2 types",
+        [3] = "Intercropping: 3 types",
+        [4] = "Intercropping: 4 types"
+    }
 }
 
 if configlanguage == "auto" then
@@ -59,6 +68,13 @@ if _G.TUNING.SNAPPINGTILLS.LANGUAGE == "sch" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_3x3 = "犁地模式: 3x3"
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_2x2 = "犁地模式: 2x2"
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "犁地模式: 六边形(1田10坑)"
+    _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "切换间作模式"
+    _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
+        [1] = "间作模式：关闭",
+        [2] = "间作模式：2 种",
+        [3] = "间作模式：3 种",
+        [4] = "间作模式：4 种"
+    }
 elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "ru" then
     -- Russian
     _G.STRINGS.SNAPPINGTILLS.ACTION_TILL_TILE = "Вспахать автоматически тайл"
@@ -71,6 +87,13 @@ elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "ru" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_3x3 = "Snapping tills: режим 3x3"
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_2x2 = "Snapping tills: режим 2x2"
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "Snapping tills: режим шестиугольный"
+    _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "Переключить совмещение"
+    _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
+        [1] = "Совмещение: Выкл",
+        [2] = "Совмещение: 2 вида",
+        [3] = "Совмещение: 3 вида",
+        [4] = "Совмещение: 4 вида"
+    }
 elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "esp" then
     -- Español
     _G.STRINGS.SNAPPINGTILLS.ACTION_TILL_TILE = "Arrar Tierra Automaticamente"
@@ -83,6 +106,13 @@ elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "esp" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_3x3 = "Snapping tills: zona de 3x3"
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_2x2 = "Snapping tills: zona de 2x2"
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "Snapping tills: Hexagono"
+    _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "Alternar cultivo intercalado"
+    _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
+        [1] = "Cultivo intercalado: Desactivado",
+        [2] = "Cultivo intercalado: 2 tipos",
+        [3] = "Cultivo intercalado: 3 tipos",
+        [4] = "Cultivo intercalado: 4 tipos"
+    }
 end
 
 local persistentdata = require("persistentdata")
@@ -95,6 +125,7 @@ local visiblesnaps = GetModConfigData("visiblesnaps")
 local isquagmire = _G.TheNet:GetServerGameMode() == "quagmire"
 local is_on_geometricplacement = false
 local controller_autotilling = false
+local controller_autoplanting = false
 
 -- 250318 Vanca: Change the conditions which stop the queue
 local interrupt_controls = {}
@@ -128,28 +159,38 @@ _G.ACTIONS.DEPLOY.stroverridefn = function(act)
     return nil
 end
 
-local function GetSnapModeString(mode)
+local function GetSnapModeString(snap_mode)
     local postfix = ""
-
     if _G.TheInput:ControllerAttached() and controller_autotilling then
         postfix = " [auto tilling]"
     end
 
-    if mode == 0 then
+    if snap_mode == 0 then
         return _G.STRINGS.SNAPPINGTILLS.OFF
-    elseif mode == 1 then
+    elseif snap_mode == 1 then
         return _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_OPTIMIZED .. postfix
-    elseif mode == 2 then
+    elseif snap_mode == 2 then
         return _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_4x4 .. postfix
-    elseif mode == 3 then
+    elseif snap_mode == 3 then
         return _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_3x3 .. postfix
-    elseif mode == 4 then
+    elseif snap_mode == 4 then
         return _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_2x2 .. postfix
-    elseif mode == 5 then
+    elseif snap_mode == 5 then
         return _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON .. postfix
     end
 
     return ""
+end
+
+--250321 VanCa: Get the text that will show up when changing intercropping mode
+-- or when picking up seeds with Wormwood
+local function GetIntercroppingModeString(intercropping_mode)
+    local postfix = ""
+    if _G.TheInput:ControllerAttached() and controller_autoplanting then
+        postfix = " [auto planting]"
+    end
+
+    return _G.STRINGS.SNAPPINGTILLS.INTERCROPPING[intercropping_mode] .. postfix
 end
 
 local function IsDefaultScreen()
@@ -159,13 +200,6 @@ local function IsDefaultScreen()
         _G.ThePlayer.components.snaptiller ~= nil and
         not _G.ThePlayer.HUD:IsChatInputScreenOpen() and
         not _G.ThePlayer.HUD.writeablescreen
-end
-
-local function IsHandSlotItemHoe(slot)
-    return slot ~= nil and slot.equipslot == _G.EQUIPSLOTS.HANDS and slot.tile ~= nil and slot.tile.item ~= nil and
-        (slot.tile.item.prefab == "farm_hoe" or slot.tile.item.prefab == "golden_farm_hoe" or
-            slot.tile.item.prefab == "shovel_lunarplant" or
-            slot.tile.item.prefab == "quagmire_hoe")
 end
 
 local function ToggleSnapMode()
@@ -189,12 +223,42 @@ local function ToggleSnapMode()
 
         _G.ThePlayer.components.snaptiller.snapmode = snapmode
 
-        datacontainer:SetValue("version", "1.1.0")
+        datacontainer:SetValue("version", "1.1.9")
         datacontainer:SetValue("snapmode", snapmode)
         datacontainer:SetValue("controller_autotilling", controller_autotilling)
         datacontainer:Save()
 
         _G.ThePlayer.components.talker:Say(GetSnapModeString(snapmode))
+    end
+end
+
+local function ToggleIntercroppingMode()
+    if IsDefaultScreen() and _G.ThePlayer:HasTag("plantkin") then
+        local intercropping_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
+
+        if _G.TheInput:ControllerAttached() then
+            if controller_autoplanting then
+                intercropping_mode = intercropping_mode + 1
+                controller_autoplanting = false
+            else
+                controller_autoplanting = true
+            end
+        else
+            intercropping_mode = intercropping_mode + 1
+        end
+
+        if intercropping_mode > 4 then
+            intercropping_mode = 1
+        end
+
+        _G.ThePlayer.components.snaptiller.intercropping_mode = intercropping_mode
+
+        datacontainer:SetValue("version", "1.1.9")
+        datacontainer:SetValue("intercropping_mode", intercropping_mode)
+        datacontainer:SetValue("controller_autoplanting", controller_autoplanting)
+        datacontainer:Save()
+
+        _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(intercropping_mode))
     end
 end
 
@@ -241,13 +305,38 @@ if _G.KnownModIndex:IsModEnabled("workshop-351325790") then
     )
 end
 
+-- 250321 VanCa: Say about current Intercropping mode when Wormwood pick up seeds with mouse
+AddPlayerPostInit(
+    function(inst)
+        inst:ListenForEvent(
+            "newactiveitem",
+            function(local_inst, local_data)
+                -- Is Wormwood?
+                if local_inst:HasTag("plantkin") then
+                    -- Only show text when snapping mode is enabled
+                    local snap_mode = _G.ThePlayer.components.snaptiller.snapmode
+                    if
+                        snap_mode > 0 and not is_on_geometricplacement and local_data and local_data.item and
+                            local_data.item:HasTag("deployedfarmplant")
+                     then
+                        local intercropping_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
+                        _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(intercropping_mode))
+                    end
+                end
+            end
+        )
+    end
+)
+
 AddComponentPostInit(
     "placer",
     function(self, inst)
         local original_OnUpdate = self.OnUpdate
         self.OnUpdate = function(self, dt)
             original_OnUpdate(self, dt)
-            if not is_on_geometricplacement then
+            -- 250321 VanCa: Only show when snapping mode is enabled
+            local snap_mode = _G.ThePlayer.components.snaptiller.snapmode
+            if snap_mode > 0 and not is_on_geometricplacement then
                 if self.inst.prefab == "seeds_placer" and _G.ThePlayer ~= nil and _G.ThePlayer:HasTag("plantkin") then
                     if not _G.TheInput:ControllerAttached() then
                         local pos = _G.ThePlayer.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
@@ -275,22 +364,32 @@ AddComponentPostInit(
 
         local version = datacontainer:GetValue("version")
         local snapmode = datacontainer:GetValue("snapmode")
+        local intercropping_mode = datacontainer:GetValue("intercropping_mode")
         local _controller_autotilling = datacontainer:GetValue("controller_autotilling")
+        local _controller_autoplanting = datacontainer:GetValue("controller_autoplanting")
 
         --patch
         if version == nil then
             snapmode = 1
+            intercropping_mode = 1
         end
 
         if snapmode == nil then
             snapmode = 1
         end
+        if intercropping_mode == nil then
+            intercropping_mode = 1
+        end
 
         if type(_controller_autotilling) == "boolean" then
             controller_autotilling = _controller_autotilling
         end
+        if type(_controller_autoplanting) == "boolean" then
+            controller_autoplanting = _controller_autoplanting
+        end
 
         self.inst.components.snaptiller.snapmode = snapmode
+        self.inst.components.snaptiller.intercropping_mode = intercropping_mode
         self.inst.components.snaptiller.isquagmire = isquagmire
 
         local original_OnControl = self.OnControl
@@ -490,6 +589,58 @@ AddComponentPostInit(
                         self:DoAction(act)
                     end
                     return
+                elseif
+                    act.action == _G.ACTIONS.DEPLOY and act.invobject:HasTag("deployedfarmplant") and
+                        not is_on_geometricplacement
+                 then
+                    -- 250321 VanCa: Support autoplanting on controller
+                    if controller_autoplanting then
+                        self.inst.components.snaptiller:StartAutoDeployAtPoint()
+                    else
+                        local pos =
+                            self.inst.components.snaptiller:GetSnap(
+                            Point(act.pos.local_pt.x, act.pos.local_pt.y, act.pos.local_pt.z)
+                        )
+                        act.pos = _G.DynamicPosition(pos)
+
+                        if self.ismastersim then
+                            self.inst.components.combat:SetTarget(nil)
+                        elseif self.locomotor == nil then
+                            self.remote_controls[_G.CONTROL_CONTROLLER_ALTACTION] = 0
+                            _G.SendRPCToServer(
+                                _G.RPC.ControllerAltActionButtonPoint,
+                                act.action.code,
+                                act.pos.local_pt.x,
+                                act.pos.local_pt.z,
+                                nil,
+                                act.action.canforce,
+                                isspecial,
+                                act.action.mod_name,
+                                act.pos.walkable_platform,
+                                act.pos.walkable_platform ~= nil
+                            )
+                        elseif self:CanLocomote() then
+                            act.preview_cb = function()
+                                self.remote_controls[_G.CONTROL_CONTROLLER_ALTACTION] = 0
+                                local isreleased = not _G.TheInput:IsControlPressed(_G.CONTROL_CONTROLLER_ALTACTION)
+                                _G.SendRPCToServer(
+                                    _G.RPC.ControllerAltActionButtonPoint,
+                                    act.action.code,
+                                    act.pos.local_pt.x,
+                                    act.pos.local_pt.z,
+                                    isreleased,
+                                    nil,
+                                    isspecial,
+                                    act.action.mod_name,
+                                    act.pos.walkable_platform,
+                                    act.pos.walkable_platform ~= nil
+                                )
+                            end
+                        end
+
+                        self:DoAction(act)
+                    end
+                    return
                 end
             end
 
@@ -515,6 +666,17 @@ AddClassPostConstruct(
     end
 )
 
+local function IsHandSlotItemHoe(slot)
+    return slot ~= nil and slot.equipslot == _G.EQUIPSLOTS.HANDS and slot.tile ~= nil and slot.tile.item ~= nil and
+        (slot.tile.item.prefab == "farm_hoe" or slot.tile.item.prefab == "golden_farm_hoe" or
+            slot.tile.item.prefab == "shovel_lunarplant" or
+            slot.tile.item.prefab == "quagmire_hoe")
+end
+
+local function IsSlotItemSeeds(slot)
+    return slot ~= nil and slot.tile ~= nil and slot.tile.item ~= nil and slot.tile.item:HasTag("deployedfarmplant")
+end
+
 -- for support controller
 AddClassPostConstruct(
     "widgets/inventorybar",
@@ -525,12 +687,18 @@ AddClassPostConstruct(
         self.OnControl = function(self, control, down)
             local res = original_OnControl(self, control, down)
 
+            -- 250321 Vanca: Allow changing snap_mode and intercropping_mode on both Seeds & Hoe
             if
-                self.open and not down and not isquagmire and control == _G.CONTROL_MENU_MISC_2 and
-                    IsHandSlotItemHoe(self.active_slot)
+                self.open and not down and not isquagmire and
+                    (IsSlotItemSeeds(self.active_slot) or IsHandSlotItemHoe(self.active_slot))
              then
-                ToggleSnapMode()
-                return true
+                if control == _G.CONTROL_MENU_MISC_2 then
+                    ToggleSnapMode()
+                    return true
+                elseif control == _G.CONTROL_MENU_MISC_1 then
+                    ToggleIntercroppingMode()
+                    return true
+                end
             end
 
             return res
@@ -539,12 +707,22 @@ AddClassPostConstruct(
         self.UpdateCursorText = function(self)
             original_UpdateCursorText(self)
 
-            if self.open and not isquagmire and IsHandSlotItemHoe(self.active_slot) then
+            if
+                self.open and not isquagmire and
+                    (IsSlotItemSeeds(self.active_slot) or IsHandSlotItemHoe(self.active_slot))
+             then
                 local str =
                     self.actionstringbody:GetString() ..
                     "\n" ..
                         _G.TheInput:GetLocalizedControl(_G.TheInput:GetControllerID(), _G.CONTROL_MENU_MISC_2) ..
-                            " " .. _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_SNAP_MODE
+                            " " ..
+                                _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_SNAP_MODE ..
+                                    "\n" ..
+                                        _G.TheInput:GetLocalizedControl(
+                                            _G.TheInput:GetControllerID(),
+                                            _G.CONTROL_MENU_MISC_1
+                                        ) ..
+                                            " " .. _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE
                 self.actionstringbody:SetString(str)
 
                 local _, h0 = self.actionstringtitle:GetRegionSize()
@@ -571,5 +749,20 @@ _G.TheInput:AddKeyUpHandler(
     togglekey,
     function(key)
         ToggleSnapMode()
+    end
+)
+
+-- 250320 VanCa: Hotkey to toggle intercropping mode
+local toggle_intercropping_key = nil
+if key_chage_intercropping_mode ~= nil then
+    toggle_intercropping_key = _G[key_chage_intercropping_mode]
+end
+if toggle_intercropping_key == nil then
+    toggle_intercropping_key = _G.KEY_SEMICOLON
+end
+_G.TheInput:AddKeyUpHandler(
+    toggle_intercropping_key,
+    function(key)
+        ToggleIntercroppingMode()
     end
 )
