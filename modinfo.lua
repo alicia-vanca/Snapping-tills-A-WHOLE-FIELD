@@ -1,4 +1,4 @@
-version = "1.1.9_01"
+version = "1.1.9_02"
 name = "Snapping tills A WHOLE FIELD v" .. version
 description =
     [[Aligns plowing to the grid.

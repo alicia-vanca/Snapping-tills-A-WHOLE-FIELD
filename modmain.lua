@@ -233,7 +233,7 @@ local function ToggleSnapMode()
 end
 
 local function ToggleIntercroppingMode()
-    if IsDefaultScreen() and _G.ThePlayer:HasTag("plantkin") then
+    if IsDefaultScreen() then
         local intercropping_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
 
         if _G.TheInput:ControllerAttached() then
@@ -305,45 +305,31 @@ if _G.KnownModIndex:IsModEnabled("workshop-351325790") then
     )
 end
 
--- 250321 VanCa: Say about current Intercropping mode when Wormwood pick up seeds with mouse
-AddPlayerPostInit(
-    function(inst)
-        inst:ListenForEvent(
-            "newactiveitem",
-            function(local_inst, local_data)
-                -- Is Wormwood?
-                if local_inst:HasTag("plantkin") then
-                    -- Only show text when snapping mode is enabled
-                    local snap_mode = _G.ThePlayer.components.snaptiller.snapmode
-                    if
-                        snap_mode > 0 and not is_on_geometricplacement and local_data and local_data.item and
-                            local_data.item:HasTag("deployedfarmplant")
-                     then
-                        local intercropping_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
-                        _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(intercropping_mode))
-                    end
-                end
-            end
-        )
-    end
-)
-
 AddComponentPostInit(
     "placer",
     function(self, inst)
         local original_OnUpdate = self.OnUpdate
         self.OnUpdate = function(self, dt)
             original_OnUpdate(self, dt)
-            -- 250321 VanCa: Only show when snapping mode is enabled
+            -- 250322 VanCa: Show green/red circle grid when planting seeds with bare hands
+            -- Only show when snapping mode is enabled
             local snap_mode = _G.ThePlayer.components.snaptiller.snapmode
-            if snap_mode > 0 and not is_on_geometricplacement then
-                if self.inst.prefab == "seeds_placer" and _G.ThePlayer ~= nil and _G.ThePlayer:HasTag("plantkin") then
-                    if not _G.TheInput:ControllerAttached() then
-                        local pos = _G.ThePlayer.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
-                        self.inst.Transform:SetPosition(pos:Get())
-                        self.selected_pos = pos
-                    end
+            if
+                self.inst.prefab == "seeds_placer" and snap_mode > 0 and not is_on_geometricplacement and
+                    not _G.TheInput:ControllerAttached()
+             then
+                local is_deploying_seeds = _G.ThePlayer.components.snaptillplacer.deployedfarmplant
+                if not is_deploying_seeds then
+                    _G.ThePlayer.components.snaptillplacer.deployedfarmplant = true
+                    -- Say about current Intercropping mode when Wormwood pick up seeds with mouse
+                    local intercropping_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
+                    _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(intercropping_mode))
                 end
+                local pos = _G.ThePlayer.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
+                self.inst.Transform:SetPosition(pos:Get())
+                -- 250322 VanCa: Remove this line so that if player turn off snapping while planting,
+                -- the preview silhouette won't stuck in one place
+                -- self.selected_pos = pos
             end
         end
     end
