@@ -1,4 +1,8 @@
---250321 VanCa: Add intercropping handling
+-- 250321 VanCa: Add intercropping handling
+
+-- 250324 VanCa: Integrate KeyBind UI by 李皓奇
+-- https://github.com/liolok/DST-KeyBind-UI
+modimport("keybind")
 
 Assets = {
     Asset("ANIM", "anim/snaptillplacer.zip")
@@ -327,9 +331,9 @@ AddComponentPostInit(
                 end
                 local pos = _G.ThePlayer.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
                 self.inst.Transform:SetPosition(pos:Get())
-                -- 250322 VanCa: Remove this line so that if player turn off snapping while planting,
-                -- the preview silhouette won't stuck in one place
-                -- self.selected_pos = pos
+            -- 250322 VanCa: Remove this line so that if player turn off snapping while planting,
+            -- the preview silhouette won't stuck in one place
+            -- self.selected_pos = pos
             end
         end
     end
@@ -721,34 +725,34 @@ AddClassPostConstruct(
     end
 )
 
--- patch key, fixed shit after update 1.8
-local togglekey = nil
-if keychagemode ~= nil then
-    togglekey = _G[keychagemode]
-end
+local callback = {} -- config name to function called when the key event triggered
 
-if togglekey == nil then
-    togglekey = _G.KEY_L
-end
-
-_G.TheInput:AddKeyUpHandler(
-    togglekey,
-    function(key)
-        ToggleSnapMode()
-    end
-)
-
+-- Shift key is fixed after update 1.8
 -- 250320 VanCa: Hotkey to toggle intercropping mode
-local toggle_intercropping_key = nil
-if key_chage_intercropping_mode ~= nil then
-    toggle_intercropping_key = _G[key_chage_intercropping_mode]
-end
-if toggle_intercropping_key == nil then
-    toggle_intercropping_key = _G.KEY_SEMICOLON
-end
-_G.TheInput:AddKeyUpHandler(
-    toggle_intercropping_key,
-    function(key)
-        ToggleIntercroppingMode()
+callback = {
+    key_change_snap_mode = ToggleSnapMode,
+    key_change_intercropping_mode = ToggleIntercroppingMode
+}
+
+local handler = {} -- config name to key event handlers
+function KeyBind(name, key)
+    if handler[name] then
+        handler[name]:Remove()
+    end -- disable old binding
+    if key ~= nil then -- new binding
+        if key >= 1000 then -- it's a mouse button
+            handler[name] =
+                GLOBAL.TheInput:AddMouseButtonHandler(
+                function(button, down, x, y)
+                    if button == key and down then
+                        callback[name]()
+                    end
+                end
+            )
+        else -- it's a keyboard key
+            handler[name] = GLOBAL.TheInput:AddKeyDownHandler(key, callback[name])
+        end
+    else -- no binding
+        handler[name] = nil
     end
-)
+end

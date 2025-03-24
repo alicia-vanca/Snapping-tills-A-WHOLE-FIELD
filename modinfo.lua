@@ -1,4 +1,4 @@
-version = "1.1.9_02"
+version = "1.1.9_03"
 name = "Snapping tills A WHOLE FIELD v" .. version
 description =
     [[Aligns plowing to the grid.
@@ -6,6 +6,7 @@ description =
 LeftShift + RightClick: Launch auto tilling on a tile.
 LeftShift + DoubleRightClick: Launch auto tilling on multi tiles.
 Key "L": Toggle snap modes: off / optimized / 4x4 / 3x3 / 2x2 / hexagon.
+Key ";": Toggle Intercropping mode: off / intercropping 2-3-4 types of plants per tile.
 Optimized mode checks for an adjacent soil tile, if not found adjacent soil tile then uses 4x4 else uses 3x3. You can bind key in configure mod.
 
 Important:
@@ -29,104 +30,32 @@ dst_compatible = true
 all_clients_require_mod = false
 client_only_mod = true
 
-local key_list = {
-    "A",
-    "B",
-    "C",
-    "D",
-    "E",
-    "F",
-    "G",
-    "H",
-    "I",
-    "J",
-    "K",
-    "L",
-    "M",
-    "N",
-    "O",
-    "P",
-    "Q",
-    "R",
-    "S",
-    "T",
-    "U",
-    "V",
-    "W",
-    "X",
-    "Y",
-    "Z",
-    "0",
-    "1",
-    "2",
-    "3",
-    "4",
-    "5",
-    "6",
-    "7",
-    "8",
-    "9",
-    "F1",
-    "F2",
-    "F3",
-    "F4",
-    "F5",
-    "F6",
-    "F7",
-    "F8",
-    "F9",
-    "F10",
-    "F11",
-    "F12",
-    "TAB",
-    "CAPSLOCK",
-    "LSHIFT",
-    "RSHIFT",
-    "LCTRL",
-    "RCTRL",
-    "LALT",
-    "RALT",
-    "ALT",
-    "CTRL",
-    "SHIFT",
-    "SPACE",
-    "ENTER",
-    "ESCAPE",
-    "MINUS",
-    "EQUALS",
-    "BACKSPACE",
-    "PERIOD",
-    "SLASH",
-    "SEMICOLON",
-    "LEFTBRACKET",
-    "BACKSLASH",
-    "RIGHTBRACKET",
-    "TILDE",
-    "PRINT",
-    "SCROLLOCK",
-    "PAUSE",
-    "INSERT",
-    "HOME",
-    "DELETE",
-    "END",
-    "PAGEUP",
-    "PAGEDOWN",
-    "UP",
-    "DOWN",
-    "LEFT",
-    "RIGHT",
-    "KP_DIVIDE",
-    "KP_MULTIPLY",
-    "KP_PLUS",
-    "KP_MINUS",
-    "KP_ENTER",
-    "KP_PERIOD",
-    "KP_EQUALS"
+local keyboard = { -- from STRINGS.UI.CONTROLSSCREEN.INPUTS[1] of strings.lua, need to match constants.lua too.
+    { 'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12', 'Print', 'ScrolLock', 'Pause' },
+    { '1', '2', '3', '4', '5', '6', '7', '8', '9', '0' },
+    { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z' },
+    { 'Escape', 'Tab', 'CapsLock', 'LShift', 'LCtrl', 'LSuper', 'LAlt' },
+    { 'Space', 'RAlt', 'RSuper', 'RCtrl', 'RShift', 'Enter', 'Backspace' },
+    { 'Tilde', 'Minus', 'Equals', 'LeftBracket', 'RightBracket', 'Backslash', 'Semicolon', 'Period', 'Slash' }, -- punctuation
+    { 'Up', 'Down', 'Left', 'Right', 'Insert', 'Delete', 'Home', 'End', 'PageUp', 'PageDown' }, -- navigation
 }
-local key_options = {}
-
-for i = 1, #key_list do
-    key_options[i] = {description = key_list[i], data = "KEY_" .. key_list[i]}
+local numpad = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Period', 'Divide', 'Multiply', 'Minus', 'Plus' }
+local mouse = { '\238\132\130', '\238\132\131', '\238\132\132' } -- Middle Mouse Button, Mouse Button 4 and 5
+local key_disabled = {description = "Disabled", data = "KEY_DISABLED"}
+keys = {key_disabled}
+for i = 1, #mouse do
+    keys[#keys + 1] = {description = mouse[i], data = mouse[i]}
+end
+for i = 1, #keyboard do
+    for j = 1, #keyboard[i] do
+        local key = keyboard[i][j]
+        keys[#keys + 1] = {description = key, data = "KEY_" .. key:upper()}
+    end
+    keys[#keys + 1] = key_disabled
+end
+for i = 1, #numpad do
+    local key = numpad[i]
+    keys[#keys + 1] = {description = "Numpad " .. key, data = "KEY_KP_" .. key:upper()}
 end
 
 configuration_options = {
@@ -148,24 +77,24 @@ configuration_options = {
         label = "Visible snaps",
         hover = "Visible snaps",
         options = {
-            {description = "on", data = true},
-            {description = "off", data = false}
+            {description = "On", data = true},
+            {description = "Off", data = false}
         },
         default = true
     },
     {
-        name = "keychagemode",
+        name = "key_change_snap_mode",
         label = "Toggle snap mode",
         hover = "Key to toggle snap mode",
-        options = key_options,
+        options = keys,
         default = "KEY_L"
     },
     {
         -- 250320 VanCa: Add key to change intercropping mode (1/2/3/4 types of plants on 1 tile)
-        name = "key_chage_intercropping_mode",
+        name = "key_change_intercropping_mode",
         label = "Toggle intercropping mode",
         hover = "Key to toggle intercropping mode",
-        options = key_options,
+        options = keys,
         default = "KEY_SEMICOLON"
     }
 }
