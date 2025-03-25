@@ -1,4 +1,7 @@
-version = "1.1.9_03"
+-- 250324 VanCa: Integrate KeyBind UI by 李皓奇
+-- https://github.com/liolok/DST-KeyBind-UI
+
+version = "1.1.9_04"
 name = "Snapping tills A WHOLE FIELD v" .. version
 description =
     [[Aligns plowing to the grid.
@@ -36,7 +39,8 @@ local keyboard = { -- from STRINGS.UI.CONTROLSSCREEN.INPUTS[1] of strings.lua, n
     { 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z' },
     { 'Escape', 'Tab', 'CapsLock', 'LShift', 'LCtrl', 'LSuper', 'LAlt' },
     { 'Space', 'RAlt', 'RSuper', 'RCtrl', 'RShift', 'Enter', 'Backspace' },
-    { 'Tilde', 'Minus', 'Equals', 'LeftBracket', 'RightBracket', 'Backslash', 'Semicolon', 'Period', 'Slash' }, -- punctuation
+    { 'BackQuote', 'Tilde', 'Minus', 'Equals', 'LeftBracket', 'RightBracket' },
+    { 'Backslash', 'Semicolon', 'Quote', 'Period', 'Slash' }, -- punctuation
     { 'Up', 'Down', 'Left', 'Right', 'Insert', 'Delete', 'Home', 'End', 'PageUp', 'PageDown' }, -- navigation
 }
 local numpad = { '0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'Period', 'Divide', 'Multiply', 'Minus', 'Plus' }
