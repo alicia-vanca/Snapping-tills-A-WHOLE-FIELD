@@ -355,14 +355,24 @@ function SnapTiller:GetSnapListOnTile(tilex, tiley, heading)
             if self:HasAdjacentSoilTile(tilecenter) or self.snapmode == 3 then
                 -- (snapmode==optimal & HasAdjacentSoilTile) or (snapmode == 3x3)
                 if heading ~= nil then
-                    if self.intercropping_mode % 2 == 1 and HEADSNAPS.IDS_3x3[heading] ~= nil then
-                        -- Intercropping Off or intercropping 3 types
-                        for _, i in ipairs(HEADSNAPS.IDS_3x3[heading]) do
+                    local maxIdenticalPlantsPerTile = self:GetMaxIdenticalPlantsPerTile(#TILESNAPS.MAP_3x3)
+                    if
+                        (maxIdenticalPlantsPerTile == 2 or maxIdenticalPlantsPerTile == 4) and
+                            HEADSNAPS.IDS_3x3_EVEN_INTERCROPPING[heading] ~= nil
+                     then
+                        -- Intercropping 2 or 4 types. Plant order:
+                        -- 1 2 3
+                        -- 8 9 4
+                        -- 7 6 5
+                        for _, i in ipairs(HEADSNAPS.IDS_3x3_EVEN_INTERCROPPING[heading]) do
                             table.insert(map, TILESNAPS.MAP_3x3[i])
                         end
-                    elseif self.intercropping_mode % 2 == 0 and HEADSNAPS.IDS_3x3_EVEN_INTERCROPPING[heading] ~= nil then
-                        -- Intercropping 2 or 4 types
-                        for _, i in ipairs(HEADSNAPS.IDS_3x3_EVEN_INTERCROPPING[heading]) do
+                    elseif HEADSNAPS.IDS_3x3[heading] ~= nil then
+                        -- Intercropping Off or intercropping 3 types. Plant order:
+                        -- 1 2 3
+                        -- 4 5 6
+                        -- 7 8 9
+                        for _, i in ipairs(HEADSNAPS.IDS_3x3[heading]) do
                             table.insert(map, TILESNAPS.MAP_3x3[i])
                         end
                     end
@@ -659,6 +669,8 @@ function SnapTiller:GetNewActiveItem(allowed_prefabs, tags_required, validate_fu
     DebugPrint("-------------------------------------")
     DebugPrint("GetNewActiveItem: prefabs:", allowed_prefabs, "tags_required:", tags_required)
 
+    local invent = self.inst.replica.inventory
+
     -- Make sure allowed_prefabs is a table (or nil)
     allowed_prefabs =
         (type(allowed_prefabs) == "string" and allowed_prefabs ~= "" and {allowed_prefabs}) or
@@ -672,7 +684,7 @@ function SnapTiller:GetNewActiveItem(allowed_prefabs, tags_required, validate_fu
         repeat
             container:TakeActiveItemFromAllOfSlot(item_data.slot)
             Sleep(FRAMES * 3)
-        until self.inst.replica.inventory:GetActiveItem() == item_data.item
+        until invent:GetActiveItem() == item_data.item
         DebugPrint("GetNewActiveItem - Done")
         return item_data.item
     end
@@ -682,7 +694,7 @@ function SnapTiller:GetNewActiveItem(allowed_prefabs, tags_required, validate_fu
         -- in case the required item was "goldcoin", try to find a goldenpiggy and withdraw from it
         local goldenpiggy_data = self:GetSlotFromAll("goldenpiggy")
         if goldenpiggy_data then
-            self.inst.replica.inventory:UseItemFromInvTile(goldenpiggy_data.item)
+            invent:UseItemFromInvTile(goldenpiggy_data.item)
         end
 
         -- long wait
@@ -695,11 +707,54 @@ function SnapTiller:GetNewActiveItem(allowed_prefabs, tags_required, validate_fu
     end
 end
 
+-- intercropping_mode 0 (auto): max plants based on inventory first slots (max 4)
 -- intercropping_mode 1 (off): max (snap_count) plants per tile
 -- intercropping_mode 2 (intercropping 2 types): max (snap_count / 2) plants per tile
+-- intercropping_mode 3 (intercropping 3 types): max (snap_count / 3) plants per tile
 -- and so on...
 function SnapTiller:GetMaxIdenticalPlantsPerTile(snap_count)
-    return math.floor(snap_count / self.intercropping_mode)
+    DebugPrint("-------------------------------------")
+    DebugPrint("GetMaxIdenticalPlantsPerTile")
+    
+    if self.intercropping_mode ~= 0 then
+        return math.floor(snap_count / self.intercropping_mode)
+    end
+
+    local active_item = self.inst.replica.inventory and self.inst.replica.inventory:GetActiveItem()
+    local active_prefab = active_item and active_item.prefab or nil
+
+    local empty_count = 0
+    local same_prefab_count = 0
+    local denominator = 0
+
+    local invent = self.inst.replica.inventory
+    local body_items = invent:GetItems() or {}
+
+    DebugPrint("body_items ", body_items)
+    for i = 1, 4 do
+        local item = body_items[i]
+        if not item or item:HasTag("deployedfarmplant") then
+            if not item then
+                denominator = denominator + 1
+                empty_count = empty_count + 1
+            else
+                denominator = denominator + 1
+                if active_prefab and item.prefab == active_prefab then
+                    same_prefab_count = same_prefab_count + 1
+                end
+            end
+        else
+            -- Stop processing at first non-empty, non-seed slot
+            break
+        end
+    end
+
+    if (denominator == 0) or (empty_count + same_prefab_count == 0) then
+        return snap_count
+    end
+
+    local ratio = (empty_count + same_prefab_count) / denominator
+    return math.floor(snap_count * ratio)
 end
 
 -- 250321 VanCa: Add intercropping handle

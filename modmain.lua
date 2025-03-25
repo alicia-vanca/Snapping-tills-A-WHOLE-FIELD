@@ -36,6 +36,7 @@ _G.STRINGS.SNAPPINGTILLS = {
     SNAP_MODE_HEXAGON = "Snapping tills: mode hexagon",
     ACTION_CHANGE_INTERCROPPING_MODE = "Toggle intercropping mode",
     INTERCROPPING = {
+        [0] = "Intercropping: Inventory based",
         [1] = "Intercropping: Off",
         [2] = "Intercropping: 2 types",
         [3] = "Intercropping: 3 types",
@@ -74,6 +75,7 @@ if _G.TUNING.SNAPPINGTILLS.LANGUAGE == "sch" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "犁地模式: 六边形(1田10坑)"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "切换间作模式"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
+        [0] = "间作模式：基于物品栏",
         [1] = "间作模式：关闭",
         [2] = "间作模式：2 种",
         [3] = "间作模式：3 种",
@@ -93,6 +95,7 @@ elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "ru" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "Snapping tills: режим шестиугольный"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "Переключить совмещение"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
+        [0] = "Совмещение: По слотам инвентаря",
         [1] = "Совмещение: Выкл",
         [2] = "Совмещение: 2 вида",
         [3] = "Совмещение: 3 вида",
@@ -112,6 +115,7 @@ elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "esp" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "Snapping tills: Hexagono"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "Alternar cultivo intercalado"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
+        [0] = "Cultivo intercalado: Basado en inventario",
         [1] = "Cultivo intercalado: Desactivado",
         [2] = "Cultivo intercalado: 2 tipos",
         [3] = "Cultivo intercalado: 3 tipos",
@@ -252,7 +256,7 @@ local function ToggleIntercroppingMode()
         end
 
         if intercropping_mode > 4 then
-            intercropping_mode = 1
+            intercropping_mode = 0
         end
 
         _G.ThePlayer.components.snaptiller.intercropping_mode = intercropping_mode
