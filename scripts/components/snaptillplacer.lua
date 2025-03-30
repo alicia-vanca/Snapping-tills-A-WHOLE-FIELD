@@ -33,6 +33,7 @@ local SnapTillPlacer =
         self.cache_snap_mode = nil
         self.cache_adjacent_soil = nil
         self.visible = true
+        self.visible_setting = nil
         self.inst:StartUpdatingComponent(self)
     end
 )
@@ -57,24 +58,6 @@ function SnapTillPlacer:Show()
 end
 
 function SnapTillPlacer:OnUpdate(dt)
-    if self.inst == nil then
-        self:ClearLinked()
-        return
-    end
-
-    if self.inst.components.snaptiller.snap_mode == 0 then
-        self:ClearLinked()
-        return
-    end
-
-    if
-        self.inst.components.snaptiller == nil or self.inst.replica.inventory == nil or
-            (self.inst.replica.rider and self.inst.replica.rider:IsRiding())
-     then
-        self:ClearLinked()
-        return
-    end
-
     local activeitem = self.inst.replica.inventory:GetActiveItem()
 
     -- 250322 VanCa: Change "deployed_farm_plant" from a local variable to a component variable
@@ -86,94 +69,116 @@ function SnapTillPlacer:OnUpdate(dt)
         self.deployed_farm_plant = false
     end
 
-    if not self.deployed_farm_plant then
-        local equippeditem = self.inst.replica.inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
-        if
-            not equippeditem or
-                (equippeditem and equippeditem.prefab ~= "farm_hoe" and equippeditem.prefab ~= "golden_farm_hoe" and
-                    equippeditem.prefab ~= "shovel_lunarplant" and
-                    equippeditem.prefab ~= "quagmire_hoe")
-         then
-            self:ClearLinked()
-            return
-        end
-    end
-
-    local pos = nil
-
-    if TheInput:ControllerAttached() then
-        pos = Point(self.inst.entity:LocalToWorldSpace(0, 0, 0))
-    else
-        if not self.deployed_farm_plant and activeitem ~= nil then
+    if self.visible_setting then
+        if self.inst == nil then
             self:ClearLinked()
             return
         end
 
-        pos = TheInput:GetWorldPosition()
-    end
-
-    if not pos then
-        self:ClearLinked()
-        return
-    end
-
-    local tilex, tiley = TheWorld.Map:GetTileCoordsAtPoint(pos.x, pos.y, pos.z)
-    local tile = TheWorld.Map:GetTile(tilex, tiley)
-
-    if self.cache_tile_pos == nil then
-        self.cache_tile_pos = {tilex, tiley}
-    end
-
-    if self.cache_snap_mode == nil then
-        self.cache_snap_mode = self.inst.components.snaptiller.snap_mode
-    end
-
-    if self.cache_snap_mode == 1 then
-        local res =
-            self.inst.components.snaptiller:HasAdjacentSoilTile(Point(TheWorld.Map:GetTileCenterPoint(tilex, tiley)))
-        if self.cache_adjacent_soil ~= res then
-            self.cache_adjacent_soil = res
+        if self.inst.components.snaptiller.snap_mode == 0 then
             self:ClearLinked()
+            return
         end
-    end
 
-    if (tile == WORLD_TILES.FARMING_SOIL or tile == WORLD_TILES.QUAGMIRE_SOIL) or self.deployed_farm_plant then
         if
-            self.cache_tile_pos[1] ~= tilex or self.cache_tile_pos[2] ~= tiley or
-                self.cache_snap_mode ~= self.inst.components.snaptiller.snap_mode or
-                self.linked == nil
+            self.inst.components.snaptiller == nil or self.inst.replica.inventory == nil or
+                (self.inst.replica.rider and self.inst.replica.rider:IsRiding())
          then
             self:ClearLinked()
-            local snaplist = self.inst.components.snaptiller:GetSnapListOnTile(tilex, tiley)
-            for i, v in ipairs(snaplist) do
-                MakeSnapTillPlacer(self, v[1], v[2], i)
+            return
+        end
+
+        if not self.deployed_farm_plant then
+            local equippeditem = self.inst.replica.inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
+            if
+                not equippeditem or
+                    (equippeditem and equippeditem.prefab ~= "farm_hoe" and equippeditem.prefab ~= "golden_farm_hoe" and
+                        equippeditem.prefab ~= "shovel_lunarplant" and
+                        equippeditem.prefab ~= "quagmire_hoe")
+             then
+                self:ClearLinked()
+                return
             end
+        end
+
+        local pos = nil
+
+        if TheInput:ControllerAttached() then
+            pos = Point(self.inst.entity:LocalToWorldSpace(0, 0, 0))
+        else
+            if not self.deployed_farm_plant and activeitem ~= nil then
+                self:ClearLinked()
+                return
+            end
+
+            pos = TheInput:GetWorldPosition()
+        end
+
+        if not pos then
+            self:ClearLinked()
+            return
+        end
+
+        local tilex, tiley = TheWorld.Map:GetTileCoordsAtPoint(pos.x, pos.y, pos.z)
+        local tile = TheWorld.Map:GetTile(tilex, tiley)
+
+        if self.cache_tile_pos == nil then
             self.cache_tile_pos = {tilex, tiley}
-            self.cache_snap_mode = self.inst.components.snaptiller.snap_mode
-            ApplayVisible(self)
         end
-    else
-        self:ClearLinked()
-    end
 
-    if self.linked ~= nil then
-        local can = true
-        for _, v in ipairs(self.linked) do
-            if self.deployed_farm_plant then
-                local x, y, z = v.Transform:GetWorldPosition()
-                can = TheWorld.Map:CanTillSoilAtPoint(x, y, z, true)
-            else
-                if self.inst.components.snaptiller.isquagmire then
-                    can = TheWorld.Map:CanTillSoilAtPoint(Point(v.Transform:GetWorldPosition()))
-                else
-                    can = TheWorld.Map:CanTillSoilAtPoint(v.Transform:GetWorldPosition())
-                end
+        if self.cache_snap_mode == nil then
+            self.cache_snap_mode = self.inst.components.snaptiller.snap_mode
+        end
+
+        if self.cache_snap_mode == 1 then
+            local res =
+                self.inst.components.snaptiller:HasAdjacentSoilTile(
+                Point(TheWorld.Map:GetTileCenterPoint(tilex, tiley))
+            )
+            if self.cache_adjacent_soil ~= res then
+                self.cache_adjacent_soil = res
+                self:ClearLinked()
             end
+        end
 
-            if can then
-                v.AnimState:PlayAnimation("on", false)
-            else
-                v.AnimState:PlayAnimation("off", false)
+        if (tile == WORLD_TILES.FARMING_SOIL or tile == WORLD_TILES.QUAGMIRE_SOIL) or self.deployed_farm_plant then
+            if
+                self.cache_tile_pos[1] ~= tilex or self.cache_tile_pos[2] ~= tiley or
+                    self.cache_snap_mode ~= self.inst.components.snaptiller.snap_mode or
+                    self.linked == nil
+             then
+                self:ClearLinked()
+                local snaplist = self.inst.components.snaptiller:GetSnapListOnTile(tilex, tiley)
+                for i, v in ipairs(snaplist) do
+                    MakeSnapTillPlacer(self, v[1], v[2], i)
+                end
+                self.cache_tile_pos = {tilex, tiley}
+                self.cache_snap_mode = self.inst.components.snaptiller.snap_mode
+                ApplayVisible(self)
+            end
+        else
+            self:ClearLinked()
+        end
+
+        if self.linked ~= nil then
+            local can = true
+            for _, v in ipairs(self.linked) do
+                if self.deployed_farm_plant then
+                    local x, y, z = v.Transform:GetWorldPosition()
+                    can = TheWorld.Map:CanTillSoilAtPoint(x, y, z, true)
+                else
+                    if self.inst.components.snaptiller.isquagmire then
+                        can = TheWorld.Map:CanTillSoilAtPoint(Point(v.Transform:GetWorldPosition()))
+                    else
+                        can = TheWorld.Map:CanTillSoilAtPoint(v.Transform:GetWorldPosition())
+                    end
+                end
+
+                if can then
+                    v.AnimState:PlayAnimation("on", false)
+                else
+                    v.AnimState:PlayAnimation("off", false)
+                end
             end
         end
     end

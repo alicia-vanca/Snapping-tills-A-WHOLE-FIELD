@@ -153,8 +153,6 @@ local function CountPlantedSeedOnTile(self, pos, seed_prefab)
     DebugPrint("-------------------------------------")
     DebugPrint("CountPlantedSeedOnTile")
 
-    local tile = TheWorld.Map:GetTileAtPoint(pos.x, pos.y, pos.z)
-    DebugPrint("tile ", tile)
     -- Get planted prefab from seed prefab: xxxx_seeds -> farm_plant_xxxx
     seed_prefab = seed_prefab:match("^(.-)_seeds$")
     if not seed_prefab then
@@ -170,7 +168,6 @@ local function CountPlantedSeedOnTile(self, pos, seed_prefab)
     -- Search for entities within a radius of TILE_SCALE*1.5 from tile center
     -- A little more than enough ( TILE_SCALE*sqrt(2) ) but that's ok
     local planted_seeds = TheSim:FindEntities(x, 0, z, TILE_SCALE * 1.5, {"farm_plant"})
-    DebugPrint("planted_seeds: ", planted_seeds)
 
     -- Count entities that has the same prefab within pos_center's x +- 2, z +- 2
     -- add 0.005 to avoid fractional offsets (ex: ent_pos.z = "202.00050354004")
@@ -323,7 +320,7 @@ function SnapTiller:HasAdjacentSoilTile(pos)
     return false
 end
 
-function SnapTiller:GetSnapListOnTile(tilex, tiley, heading)
+function SnapTiller:GetSnapListOnTile(tilex, tiley, heading, active_item)
     local result = {}
     local map = {}
     local tilecenter = Point(TheWorld.Map:GetTileCenterPoint(tilex, tiley))
@@ -366,7 +363,7 @@ function SnapTiller:GetSnapListOnTile(tilex, tiley, heading)
             if self:HasAdjacentSoilTile(tilecenter) or self.snap_mode == 3 then
                 -- (snap_mode == optimal & HasAdjacentSoilTile) or (snap_mode == 3x3)
                 if heading ~= nil then
-                    local maxIdenticalPlantsPerTile = self:GetMaxIdenticalPlantsPerTile(#TILESNAPS.MAP_3x3)
+                    local maxIdenticalPlantsPerTile = self:GetMaxIdenticalPlantsPerTile(#TILESNAPS.MAP_3x3, active_item)
                     if
                         (maxIdenticalPlantsPerTile == 2 or maxIdenticalPlantsPerTile == 4) and
                             HEADSNAPS.IDS_3x3_EVEN_INTERCROPPING[heading] ~= nil
@@ -721,21 +718,20 @@ function SnapTiller:GetNewActiveItem(allowed_prefabs, tags_required, validate_fu
     end
 end
 
--- intercropping_mode 0 (auto): max plants based on inventory first slots (max 4)
--- intercropping_mode 1 (off): max (snap_count) plants per tile
+-- 250330 VanCa: removed intercropping_mode 1 (off): max (snap_count) plants per tile
+-- intercropping_mode 1 (auto): max plants based on inventory first slots (max 4)
 -- intercropping_mode 2 (intercropping 2 types): max (snap_count / 2) plants per tile
 -- intercropping_mode 3 (intercropping 3 types): max (snap_count / 3) plants per tile
 -- and so on...
-function SnapTiller:GetMaxIdenticalPlantsPerTile(snap_count)
+function SnapTiller:GetMaxIdenticalPlantsPerTile(snap_count, active_item)
     DebugPrint("-------------------------------------")
     DebugPrint("GetMaxIdenticalPlantsPerTile")
 
-    if self.intercropping_mode ~= 0 then
+    if self.intercropping_mode > 1 or not active_item then
         return math.floor(snap_count / self.intercropping_mode)
     end
 
-    local active_item = self.inst.replica.inventory and self.inst.replica.inventory:GetActiveItem()
-    local active_prefab = active_item and active_item.prefab or nil
+    local active_prefab = active_item.prefab
 
     local empty_count = 0
     local same_prefab_count = 0
@@ -753,7 +749,7 @@ function SnapTiller:GetMaxIdenticalPlantsPerTile(snap_count)
                 empty_count = empty_count + 1
             else
                 denominator = denominator + 1
-                if active_prefab and item.prefab == active_prefab then
+                if item.prefab == active_prefab then
                     same_prefab_count = same_prefab_count + 1
                 end
             end
@@ -781,9 +777,11 @@ function SnapTiller:StartAutoDeployTile(tile)
     local tilex, tiley = TheWorld.Map:GetTileCoordsAtPoint(target_pos.x, target_pos.y, target_pos.z)
     local index = 1
 
-    self.snaplistaction = self:GetSnapListOnTile(tilex, tiley, TheCamera.heading)
+    local active_item = self.inst.replica.inventory and self.inst.replica.inventory:GetActiveItem()
 
-    local maxIdenticalPlantsPerTile = self:GetMaxIdenticalPlantsPerTile(#self.snaplistaction)
+    self.snaplistaction = self:GetSnapListOnTile(tilex, tiley, TheCamera.heading, active_item)
+	
+    local maxIdenticalPlantsPerTile = self:GetMaxIdenticalPlantsPerTile(#self.snaplistaction, active_item)
 
     -- 250318 VanCa: Removed this part to plant in narrowed spaces with Wormwood
     -- for i = #self.snaplistaction, 1, -1 do
@@ -801,7 +799,6 @@ function SnapTiller:StartAutoDeployTile(tile)
     -- if flagremove then table.remove(self.snaplistaction, i) end
     -- end
 
-    local active_item = self.inst.replica.inventory and self.inst.replica.inventory:GetActiveItem()
 
     while self.inst:IsValid() and active_item and
         CountPlantedSeedOnTile(self, target_pos, active_item.prefab) < maxIdenticalPlantsPerTile do
@@ -817,7 +814,7 @@ function SnapTiller:StartAutoDeployTile(tile)
 
         -- 250321 VanCa: Auto "reload" seeds
         if not self.inst.replica.inventory:GetActiveItem() then
-            self:GetNewActiveItem(active_item.prefab)
+            active_item = self:GetNewActiveItem(active_item.prefab)
         end
     end
     return true
