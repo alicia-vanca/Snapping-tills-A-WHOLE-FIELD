@@ -66,7 +66,7 @@ function to_string(tbl)
     return tostring(tbl) .. " (" .. type(tbl) .. ")"
 end
 
-local DebugPrint = true and function(...)
+local DebugPrint = false and function(...)
         local msg = "[SnappingTills]"
         for i = 1, arg.n do
             msg = msg .. " " .. to_string(arg[i])
@@ -507,9 +507,7 @@ AddComponentPostInit(
 
         self.inst:AddComponent("snaptiller")
 
-        if visiblesnaps then
-            self.inst:AddComponent("snaptillplacer")
-        end
+        self.inst:AddComponent("snaptillplacer")
 
         local version = datacontainer:GetValue("version")
         local snap_mode = datacontainer:GetValue("snap_mode")
@@ -542,6 +540,8 @@ AddComponentPostInit(
         self.inst.components.snaptiller.snap_mode = snap_mode
         self.inst.components.snaptiller.intercropping_mode = intercropping_mode
         self.inst.components.snaptiller.isquagmire = isquagmire
+	
+        self.inst.components.snaptillplacer.visible_setting = visiblesnaps
 
         local original_OnControl = self.OnControl
         local original_OnRightClick = self.OnRightClick
