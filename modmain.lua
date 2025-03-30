@@ -493,7 +493,6 @@ function isPlantingAtPoint(self, act)
     elseif act == nil then
         local pos = self.inst.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
         local is_land = _G.TheWorld.Map:IsLandTileAtPoint(pos.x, pos.y, pos.z)
-        _G.ThePlayer.components.talker:Say(to_string(is_land))
         return is_land and _G.ThePlayer.components.snaptillplacer.deployed_farm_plant
     end
     return false
@@ -630,7 +629,7 @@ AddComponentPostInit(
                 end
 
                 -- Tilling
-                if isTillingAtPoint(self) then
+                if isTillingAtPoint(self, act) then
                     -- 250318 VanCa: only process mouse-up event to prevent double process per click
                     -- and compatible with ActionQueuer RB3
                     if not down then

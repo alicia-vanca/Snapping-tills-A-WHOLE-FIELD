@@ -1,6 +1,8 @@
 -- 250617 VanCa: Add QueueManager to handle farm tiles queue
 local QueueManager = require("components/queuemanager")
 
+local DebugPrint = _G.SnappingTills.DebugPrint
+
 local TILESNAPS = {
     MAP_2x2 = {{-1, -1}, {1, -1}, {-1, 1}, {1, 1}},
     MAP_3x3 = {
