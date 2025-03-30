@@ -188,9 +188,10 @@ local function CountPlantedSeedOnTile(self, pos, seed_prefab)
     return seed_count
 end
 
-local function DoActionTill(self, pos)
+local function DoActionTill(self, coord)
     DebugPrint("-------------------------------------")
-    DebugPrint("DoActionTill pos:", pos)
+    DebugPrint("DoActionTill coord:", coord)
+    local pos = Point(coord[1], 0, coord[2])
     local cantill = true
     local x, y, z = pos:Get()
     local item = self.inst.replica.inventory and self.inst.replica.inventory:GetEquippedItem(EQUIPSLOTS.HANDS)
@@ -200,36 +201,39 @@ local function DoActionTill(self, pos)
         return false
     end
 
-    if self.isquagmire then
-        cantill = TheWorld.Map:CanTillSoilAtPoint(pos)
-    else
-        cantill = TheWorld.Map:CanTillSoilAtPoint(x, y, z)
-    end
-    if cantill then
-        local playercontroller = self.inst.components.playercontroller
-        local act = BufferedAction(self.inst, nil, ACTIONS.TILL, item, pos)
-
-        if playercontroller.ismastersim then
-            self.inst.components.combat:SetTarget(nil)
-            playercontroller:DoAction(act)
+    -- 250330 VanCa: Repeatedly send the action until the location is tilled (useful when the network is unstable)
+    repeat
+        if self.isquagmire then
+            cantill = TheWorld.Map:CanTillSoilAtPoint(pos)
         else
-            if playercontroller.locomotor then
-                act.preview_cb = function()
-                    SendRPCToServer(RPC.RightClick, ACTIONS.TILL.code, pos.x, pos.z, nil, nil, true)
-                end
+            cantill = TheWorld.Map:CanTillSoilAtPoint(x, y, z)
+        end
+        if cantill then
+            local playercontroller = self.inst.components.playercontroller
+            local act = BufferedAction(self.inst, nil, ACTIONS.TILL, item, pos)
+
+            if playercontroller.ismastersim then
+                self.inst.components.combat:SetTarget(nil)
                 playercontroller:DoAction(act)
             else
-                SendRPCToServer(RPC.RightClick, ACTIONS.TILL.code, pos.x, pos.z, nil, nil, true)
+                if playercontroller.locomotor then
+                    act.preview_cb = function()
+                        SendRPCToServer(RPC.RightClick, ACTIONS.TILL.code, pos.x, pos.z, nil, nil, true)
+                    end
+                    playercontroller:DoAction(act)
+                else
+                    SendRPCToServer(RPC.RightClick, ACTIONS.TILL.code, pos.x, pos.z, nil, nil, true)
+                end
             end
-        end
 
-        Sleep(FRAMES * 6)
-        repeat
-            Sleep(FRAMES * 3)
-        until not (self.inst.sg and self.inst.sg:HasStateTag("moving")) and not self.inst:HasTag("moving") and
-            self.inst:HasTag("idle") and
-            not self.inst.components.playercontroller:IsDoingOrWorking()
-    end
+            Sleep(FRAMES * 6)
+            repeat
+                Sleep(FRAMES * 3)
+            until not (self.inst.sg and self.inst.sg:HasStateTag("moving")) and not self.inst:HasTag("moving") and
+                self.inst:HasTag("idle") and
+                not self.inst.components.playercontroller:IsDoingOrWorking()
+        end
+    until not cantill or not self:isValidSnap(coord)
     DebugPrint("end")
 
     return true
@@ -245,35 +249,40 @@ local function DoActionDeploy(self, pos)
         return false
     end
 
-    if TheWorld.Map:CanTillSoilAtPoint(x, y, z, true) then
-        DebugPrint("CanTillSoilAtPoint")
-        local playercontroller = self.inst.components.playercontroller
-        local act = BufferedAction(self.inst, nil, ACTIONS.DEPLOY, item, pos)
+    -- 250330 VanCa: Repeatedly send the action until the location is planted (useful when the network is unstable)
+    local can_plant
+    repeat
+        can_plant = TheWorld.Map:CanTillSoilAtPoint(x, y, z, true)
+        if can_plant then
+            DebugPrint("CanTillSoilAtPoint")
+            local playercontroller = self.inst.components.playercontroller
+            local act = BufferedAction(self.inst, nil, ACTIONS.DEPLOY, item, pos)
 
-        if playercontroller.ismastersim then
-            DebugPrint("playercontroller.ismastersim")
-            self.inst.components.combat:SetTarget(nil)
-            playercontroller:DoAction(act)
-        else
-            if playercontroller.locomotor then
-                act.preview_cb = function()
-                    DebugPrint("locomotor SendRPCToServer")
-                    SendRPCToServer(RPC.RightClick, ACTIONS.DEPLOY.code, pos.x, pos.z, nil, nil, true)
-                end
+            if playercontroller.ismastersim then
+                DebugPrint("playercontroller.ismastersim")
+                self.inst.components.combat:SetTarget(nil)
                 playercontroller:DoAction(act)
             else
-                DebugPrint("SendRPCToServer")
-                SendRPCToServer(RPC.RightClick, ACTIONS.DEPLOY.code, pos.x, pos.z, nil, nil, true)
+                if playercontroller.locomotor then
+                    act.preview_cb = function()
+                        DebugPrint("locomotor SendRPCToServer")
+                        SendRPCToServer(RPC.RightClick, ACTIONS.DEPLOY.code, pos.x, pos.z, nil, nil, true)
+                    end
+                    playercontroller:DoAction(act)
+                else
+                    DebugPrint("SendRPCToServer")
+                    SendRPCToServer(RPC.RightClick, ACTIONS.DEPLOY.code, pos.x, pos.z, nil, nil, true)
+                end
             end
-        end
 
-        Sleep(FRAMES * 6)
-        repeat
-            Sleep(FRAMES * 3)
-        until not (self.inst.sg and self.inst.sg:HasStateTag("moving")) and not self.inst:HasTag("moving") and
-            self.inst:HasTag("idle") and
-            not self.inst.components.playercontroller:IsDoingOrWorking()
-    end
+            Sleep(FRAMES * 6)
+            repeat
+                Sleep(FRAMES * 3)
+            until not (self.inst.sg and self.inst.sg:HasStateTag("moving")) and not self.inst:HasTag("moving") and
+                self.inst:HasTag("idle") and
+                not self.inst.components.playercontroller:IsDoingOrWorking()
+        end
+    until not can_plant
 
     return true
 end
@@ -282,7 +291,7 @@ local SnapTiller =
     Class(
     function(self, inst)
         self.inst = inst
-        self.snapmode = 0
+        self.snap_mode = 0
         self.intercropping_mode = 1
         self.isquagmire = false
         self.actionthread = nil
@@ -351,9 +360,9 @@ function SnapTiller:GetSnapListOnTile(tilex, tiley, heading)
         end
     else
         -- 250321 VanCa: Add handling for even-types intercropping
-        if self.snapmode == 1 or self.snapmode == 3 then
-            if self:HasAdjacentSoilTile(tilecenter) or self.snapmode == 3 then
-                -- (snapmode==optimal & HasAdjacentSoilTile) or (snapmode == 3x3)
+        if self.snap_mode == 1 or self.snap_mode == 3 then
+            if self:HasAdjacentSoilTile(tilecenter) or self.snap_mode == 3 then
+                -- (snap_mode == optimal & HasAdjacentSoilTile) or (snap_mode == 3x3)
                 if heading ~= nil then
                     local maxIdenticalPlantsPerTile = self:GetMaxIdenticalPlantsPerTile(#TILESNAPS.MAP_3x3)
                     if
@@ -380,7 +389,7 @@ function SnapTiller:GetSnapListOnTile(tilex, tiley, heading)
                     map = TILESNAPS.MAP_3x3
                 end
             else
-                -- (snapmode==optimal & don't HasAdjacentSoilTile)
+                -- (snap_mode==optimal & don't HasAdjacentSoilTile)
                 if heading ~= nil and HEADSNAPS.IDS_4x4[heading] ~= nil then
                     for _, i in ipairs(HEADSNAPS.IDS_4x4[heading]) do
                         table.insert(map, TILESNAPS.MAP_4x4[i])
@@ -389,7 +398,7 @@ function SnapTiller:GetSnapListOnTile(tilex, tiley, heading)
                     map = TILESNAPS.MAP_4x4
                 end
             end
-        elseif self.snapmode == 2 then
+        elseif self.snap_mode == 2 then
             if heading ~= nil and HEADSNAPS.IDS_4x4[heading] ~= nil then
                 for _, i in ipairs(HEADSNAPS.IDS_4x4[heading]) do
                     table.insert(map, TILESNAPS.MAP_4x4[i])
@@ -397,7 +406,7 @@ function SnapTiller:GetSnapListOnTile(tilex, tiley, heading)
             else
                 map = TILESNAPS.MAP_4x4
             end
-        elseif self.snapmode == 4 then
+        elseif self.snap_mode == 4 then
             if heading ~= nil and HEADSNAPS.IDS_2x2[heading] ~= nil then
                 for _, i in ipairs(HEADSNAPS.IDS_2x2[heading]) do
                     table.insert(map, TILESNAPS.MAP_2x2[i])
@@ -405,7 +414,7 @@ function SnapTiller:GetSnapListOnTile(tilex, tiley, heading)
             else
                 map = TILESNAPS.MAP_2x2
             end
-        elseif self.snapmode == 5 then
+        elseif self.snap_mode == 5 then
             if tiley % 2 == 0 then
                 if heading ~= nil and HEADSNAPS.IDS_HEXAGON[heading] ~= nil then
                     for _, i in ipairs(HEADSNAPS.IDS_HEXAGON[heading]) do
@@ -461,7 +470,18 @@ function SnapTiller:GetSnap(pos)
     return pos
 end
 
+function SnapTiller:isValidSnap(snap)
+    local ents = TheSim:FindEntities(snap[1], 0, snap[2], 0.005, {"soil"})
+    for _, v in pairs(ents) do
+        if not v:HasTag("NOCLICK") then
+            return false
+        end
+    end
+    return true
+end
+
 function SnapTiller:StartAutoTillTile(tile)
+    DebugPrint("-------------------------------------")
     DebugPrint("StartAutoTillTile(tile) tile: ", tile)
 
     local target_pos = tile:GetPosition()
@@ -476,17 +496,7 @@ function SnapTiller:StartAutoTillTile(tile)
     -- Filter invalid snaps
     for i = #self.snaplistaction, 1, -1 do
         local snap = self.snaplistaction[i]
-        local ents = TheSim:FindEntities(snap[1], 0, snap[2], 0.005, {"soil"})
-        local flagremove = false
-
-        for _, v in pairs(ents) do
-            if not v:HasTag("NOCLICK") then
-                flagremove = true
-                break
-            end
-        end
-
-        if flagremove then
+        if not self:isValidSnap(snap) then
             table.remove(self.snaplistaction, i)
         end
     end
@@ -498,10 +508,12 @@ function SnapTiller:StartAutoTillTile(tile)
         if coord == nil then
             break
         end
-        if not DoActionTill(self, Point(coord[1], 0, coord[2])) then
+
+        if not DoActionTill(self, coord) then
             break
         end
 
+        -- Process to the next snap
         index = index + 1
     end
     return true
@@ -715,7 +727,7 @@ end
 function SnapTiller:GetMaxIdenticalPlantsPerTile(snap_count)
     DebugPrint("-------------------------------------")
     DebugPrint("GetMaxIdenticalPlantsPerTile")
-    
+
     if self.intercropping_mode ~= 0 then
         return math.floor(snap_count / self.intercropping_mode)
     end
@@ -771,7 +783,7 @@ function SnapTiller:StartAutoDeployTile(tile)
 
     local maxIdenticalPlantsPerTile = self:GetMaxIdenticalPlantsPerTile(#self.snaplistaction)
 
-    -- 250318 VanCa: Remove this part to plant in narrowed spaces with Wormwood
+    -- 250318 VanCa: Removed this part to plant in narrowed spaces with Wormwood
     -- for i = #self.snaplistaction, 1, -1 do
     -- local snap = self.snaplistaction[i]
     -- local ents = TheSim:FindEntities(snap[1], 0, snap[2], 0.005, {"soil"})

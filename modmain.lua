@@ -13,6 +13,73 @@ PrefabFiles = {
 }
 
 local _G = GLOBAL
+
+function table_print(tt, indent, done)
+    done = done or {}
+    indent = indent or 0
+    local spacer = string.rep("  ", indent)
+
+    if type(tt) == "table" then
+        if done[tt] then
+            return "table (circular reference)"
+        end
+        done[tt] = true
+
+        local sb = {"{\n"}
+        for key, value in pairs(tt) do
+            table.insert(sb, spacer .. "  ")
+            if type(key) == "number" then
+                table.insert(sb, string.format("[%d] = ", key))
+            else
+                table.insert(sb, string.format("%s = ", tostring(key)))
+            end
+
+            -- Expand 1 level deep, show type for deeper tables
+            if type(value) == "table" then
+                if indent < 1 then -- Only expand up to 1 level deep
+                    table.insert(sb, table_print(value, indent + 1, done))
+                else
+                    table.insert(sb, tostring(value) .. " (table)")
+                end
+            else
+                table.insert(sb, tostring(value) .. " (" .. type(value) .. ")")
+            end
+            table.insert(sb, ",\n")
+        end
+        table.insert(sb, spacer .. "}")
+        done[tt] = nil -- Allow reuse of this table in other branches
+        return table.concat(sb)
+    else
+        return tostring(tt) .. " (" .. type(tt) .. ")"
+    end
+end
+
+function to_string(tbl)
+    if tbl == nil then
+        return "nil"
+    end
+    if type(tbl) == "table" then
+        return table_print(tbl, 0, {})
+    elseif "string" == type(tbl) then
+        return tbl
+    end
+    return tostring(tbl) .. " (" .. type(tbl) .. ")"
+end
+
+local DebugPrint = true and function(...)
+        local msg = "[SnappingTills]"
+        for i = 1, arg.n do
+            msg = msg .. " " .. to_string(arg[i])
+        end
+        if arg.n > 1 then
+            msg = msg .. "\n"
+        end
+        print(msg)
+    end or function()
+    end
+_G.SnappingTills = {}
+_G.SnappingTills.DebugPrint = DebugPrint
+
 mods = _G.rawget(_G, "mods") or (function()
         local m = {}
         _G.rawset(_G, "mods", m)
@@ -36,8 +103,8 @@ _G.STRINGS.SNAPPINGTILLS = {
     SNAP_MODE_HEXAGON = "Snapping tills: mode hexagon",
     ACTION_CHANGE_INTERCROPPING_MODE = "Toggle intercropping mode",
     INTERCROPPING = {
-        [0] = "Intercropping: Inventory based",
-        [1] = "Intercropping: Off",
+        [1] = "Intercropping: Inventory based",
+        -- [1] = "Intercropping: Off",
         [2] = "Intercropping: 2 types",
         [3] = "Intercropping: 3 types",
         [4] = "Intercropping: 4 types"
@@ -75,8 +142,8 @@ if _G.TUNING.SNAPPINGTILLS.LANGUAGE == "sch" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "犁地模式: 六边形(1田10坑)"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "切换间作模式"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
-        [0] = "间作模式：基于物品栏",
-        [1] = "间作模式：关闭",
+        [1] = "间作模式：基于物品栏",
+        -- [1] = "间作模式：关闭",
         [2] = "间作模式：2 种",
         [3] = "间作模式：3 种",
         [4] = "间作模式：4 种"
@@ -95,8 +162,8 @@ elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "ru" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "Snapping tills: режим шестиугольный"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "Переключить совмещение"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
-        [0] = "Совмещение: По слотам инвентаря",
-        [1] = "Совмещение: Выкл",
+        [1] = "Совмещение: По слотам инвентаря",
+        -- [1] = "Совмещение: Выкл",
         [2] = "Совмещение: 2 вида",
         [3] = "Совмещение: 3 вида",
         [4] = "Совмещение: 4 вида"
@@ -115,8 +182,8 @@ elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "esp" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "Snapping tills: Hexagono"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "Alternar cultivo intercalado"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
-        [0] = "Cultivo intercalado: Basado en inventario",
-        [1] = "Cultivo intercalado: Desactivado",
+        [1] = "Cultivo intercalado: Basado en inventario",
+        -- [1] = "Cultivo intercalado: Desactivado",
         [2] = "Cultivo intercalado: 2 tipos",
         [3] = "Cultivo intercalado: 3 tipos",
         [4] = "Cultivo intercalado: 4 tipos"
@@ -147,7 +214,7 @@ _G.ACTIONS.TILL.stroverridefn = function(act)
         return _G.STRINGS.SNAPPINGTILLS.ACTION_TILL_TILE
     elseif
         _G.TheInput:IsKeyDown(_G.KEY_LSHIFT) and (not _G.ACTIONS.TILL.tile_placer or not is_on_geometricplacement) and
-            _G.ThePlayer.components.snaptiller.snapmode ~= 0
+            _G.ThePlayer.components.snaptiller.snap_mode ~= 0
      then
         return _G.STRINGS.SNAPPINGTILLS.ACTION_TILL_TILE
     end
@@ -158,7 +225,7 @@ end
 _G.ACTIONS.DEPLOY.stroverridefn = function(act)
     if
         _G.TheInput:IsKeyDown(_G.KEY_LSHIFT) and not is_on_geometricplacement and
-            _G.ThePlayer.components.snaptiller.snapmode ~= 0 and
+            _G.ThePlayer.components.snaptiller.snap_mode ~= 0 and
             act.invobject:HasTag("deployedfarmplant")
      then
         return _G.STRINGS.SNAPPINGTILLS.ACTION_DEPLOY_TILE
@@ -210,63 +277,111 @@ local function IsDefaultScreen()
         not _G.ThePlayer.HUD.writeablescreen
 end
 
+-- Get enabled snap modes from config
+local enabled_snap_modes = {}
+
+for mode = 0, 5 do
+    if mode == 0 and GetModConfigData("enable_off_mode") then
+        table.insert(enabled_snap_modes, mode)
+    elseif mode == 1 and GetModConfigData("enable_optimized_mode") then
+        table.insert(enabled_snap_modes, mode)
+    elseif mode == 2 and GetModConfigData("enable_4x4_mode") then
+        table.insert(enabled_snap_modes, mode)
+    elseif mode == 3 and GetModConfigData("enable_3x3_mode") then
+        table.insert(enabled_snap_modes, mode)
+    elseif mode == 4 and GetModConfigData("enable_2x2_mode") then
+        table.insert(enabled_snap_modes, mode)
+    elseif mode == 5 and GetModConfigData("enable_hexagon_mode") then
+        table.insert(enabled_snap_modes, mode)
+    end
+end
+
 local function ToggleSnapMode()
     if IsDefaultScreen() then
-        local snapmode = _G.ThePlayer.components.snaptiller.snapmode
+        local current_mode = _G.ThePlayer.components.snaptiller.snap_mode
 
-        if _G.TheInput:ControllerAttached() and snapmode > 0 then
+        -- Find next valid mode
+        local next_index = 3
+        for i, mode in ipairs(enabled_snap_modes) do
+            if mode == current_mode then
+                next_index = i % #enabled_snap_modes + 1
+                break
+            end
+        end
+
+        local new_mode = enabled_snap_modes[next_index]
+
+        -- Controller handling
+        -- off > mode A > excute auto tilling mode A > mode B > excute auto tilling mode B > ...
+        if _G.TheInput:ControllerAttached() then
             if controller_autotilling then
-                snapmode = snapmode + 1
                 controller_autotilling = false
-            else
+            elseif enabled_snap_modes[next_index] > 0 then
+                new_mode = current_mode
                 controller_autotilling = true
             end
-        else
-            snapmode = snapmode + 1
         end
 
-        if snapmode > 5 then
-            snapmode = 0
-        end
-
-        _G.ThePlayer.components.snaptiller.snapmode = snapmode
+        _G.ThePlayer.components.snaptiller.snap_mode = new_mode
 
         datacontainer:SetValue("version", "1.1.9")
-        datacontainer:SetValue("snapmode", snapmode)
+        datacontainer:SetValue("snap_mode", new_mode)
         datacontainer:SetValue("controller_autotilling", controller_autotilling)
         datacontainer:Save()
 
-        _G.ThePlayer.components.talker:Say(GetSnapModeString(snapmode))
+        _G.ThePlayer.components.talker:Say(GetSnapModeString(new_mode))
+    end
+end
+
+-- Get enabled intercropping modes from config
+local enabled_intercropping_modes = {}
+
+for mode = 1, 4 do
+    if mode == 1 and GetModConfigData("enable_auto_mode") then
+        table.insert(enabled_intercropping_modes, mode)
+    elseif mode == 2 and GetModConfigData("enable_2_types_mode") then
+        table.insert(enabled_intercropping_modes, mode)
+    elseif mode == 3 and GetModConfigData("enable_3_types_mode") then
+        table.insert(enabled_intercropping_modes, mode)
+    elseif mode == 4 and GetModConfigData("enable_4_types_mode") then
+        table.insert(enabled_intercropping_modes, mode)
     end
 end
 
 local function ToggleIntercroppingMode()
     if IsDefaultScreen() then
-        local intercropping_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
+        local current_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
 
+        -- Find next valid mode
+        local next_index = 1
+        for i, mode in ipairs(enabled_intercropping_modes) do
+            if mode == current_mode then
+                next_index = i % #enabled_intercropping_modes + 1
+                break
+            end
+        end
+
+        local new_mode = enabled_intercropping_modes[next_index]
+
+        -- Controller handling
+        -- mode A > excute auto planting mode A > mode B > excute auto planting mode B > ...
         if _G.TheInput:ControllerAttached() then
             if controller_autoplanting then
-                intercropping_mode = intercropping_mode + 1
                 controller_autoplanting = false
             else
+                new_mode = current_mode
                 controller_autoplanting = true
             end
-        else
-            intercropping_mode = intercropping_mode + 1
         end
 
-        if intercropping_mode > 4 then
-            intercropping_mode = 0
-        end
-
-        _G.ThePlayer.components.snaptiller.intercropping_mode = intercropping_mode
+        _G.ThePlayer.components.snaptiller.intercropping_mode = new_mode
 
         datacontainer:SetValue("version", "1.1.9")
-        datacontainer:SetValue("intercropping_mode", intercropping_mode)
+        datacontainer:SetValue("intercropping_mode", new_mode)
         datacontainer:SetValue("controller_autoplanting", controller_autoplanting)
         datacontainer:Save()
 
-        _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(intercropping_mode))
+        _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(new_mode))
     end
 end
 
@@ -321,27 +436,68 @@ AddComponentPostInit(
             original_OnUpdate(self, dt)
             -- 250322 VanCa: Show green/red circle grid when planting seeds with bare hands
             -- Only show when snapping mode is enabled
-            local snap_mode = _G.ThePlayer.components.snaptiller.snapmode
+            local snap_mode = _G.ThePlayer.components.snaptiller.snap_mode
             if
                 self.inst.prefab == "seeds_placer" and snap_mode > 0 and not is_on_geometricplacement and
                     not _G.TheInput:ControllerAttached()
              then
-                local is_deploying_seeds = _G.ThePlayer.components.snaptillplacer.deployedfarmplant
+                local is_deploying_seeds = _G.ThePlayer.components.snaptillplacer.deployed_farm_plant
                 if not is_deploying_seeds then
-                    _G.ThePlayer.components.snaptillplacer.deployedfarmplant = true
+                    _G.ThePlayer.components.snaptillplacer.deployed_farm_plant = true
                     -- Say about current Intercropping mode when Wormwood pick up seeds with mouse
                     local intercropping_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
                     _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(intercropping_mode))
                 end
                 local pos = _G.ThePlayer.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
                 self.inst.Transform:SetPosition(pos:Get())
-            -- 250322 VanCa: Remove this line so that if player turn off snapping while planting,
-            -- the preview silhouette won't stuck in one place
-            -- self.selected_pos = pos
+                self.selected_pos = pos
             end
         end
     end
 )
+
+-- 250330 VanCa: Make snap tilling easier. Trigger tilling by clicking on a farm tile instead of its snap point
+function isTillingAtPoint(self, act)
+    if act and act.action == _G.ACTIONS.TILL and not (_G.ACTIONS.TILL.tile_placer and is_on_geometricplacement) then
+        return true
+    elseif act == nil then
+        local equipped_item = self.inst.replica.inventory:GetEquippedItem(_G.EQUIPSLOTS.HANDS)
+        if
+            equipped_item and
+                (equipped_item.prefab == "farm_hoe" or equipped_item.prefab == "golden_farm_hoe" or
+                    equipped_item.prefab == "shovel_lunarplant" or
+                    equipped_item.prefab == "quagmire_hoe")
+         then
+            local pos = self.inst.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
+            local is_farm_tile = false
+            for _, ent in pairs(_G.TheWorld.Map:GetEntitiesOnTileAtPoint(pos.x, pos.y, pos.z)) do
+                -- Look for tile's nutrients_overlay entity, that's a farm tile
+                if ent.prefab == "nutrients_overlay" then
+                    is_farm_tile = true
+                    break
+                end
+            end
+            return is_farm_tile
+        end
+    end
+    return false
+end
+
+-- 250330 VanCa: Make snap planting easier. Trigger planting by clicking on land tile instead of its snap point
+function isPlantingAtPoint(self, act)
+    if
+        act and act.action == _G.ACTIONS.DEPLOY and act.invobject:HasTag("deployedfarmplant") and
+            not is_on_geometricplacement
+     then
+        return true
+    elseif act == nil then
+        local pos = self.inst.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
+        local is_land = _G.TheWorld.Map:IsLandTileAtPoint(pos.x, pos.y, pos.z)
+        _G.ThePlayer.components.talker:Say(to_string(is_land))
+        return is_land and _G.ThePlayer.components.snaptillplacer.deployed_farm_plant
+    end
+    return false
+end
 
 AddComponentPostInit(
     "playercontroller",
@@ -357,21 +513,23 @@ AddComponentPostInit(
         end
 
         local version = datacontainer:GetValue("version")
-        local snapmode = datacontainer:GetValue("snapmode")
+        local snap_mode = datacontainer:GetValue("snap_mode")
         local intercropping_mode = datacontainer:GetValue("intercropping_mode")
         local _controller_autotilling = datacontainer:GetValue("controller_autotilling")
         local _controller_autoplanting = datacontainer:GetValue("controller_autoplanting")
 
-        --patch
-        if version == nil then
-            snapmode = 1
+        if #enabled_snap_modes == 0 then
+            -- Fallback if all snap modes disabled
+            table.insert(enabled_snap_modes, 0)
+            snap_mode = 0
+        elseif version == nil or snap_mode == nil then
+            snap_mode = 3
+        end
+        if #enabled_intercropping_modes == 0 then
+            -- Fallback if all intercropping modes disabled
+            table.insert(enabled_intercropping_modes, 1)
             intercropping_mode = 1
-        end
-
-        if snapmode == nil then
-            snapmode = 1
-        end
-        if intercropping_mode == nil then
+        elseif version == nil or intercropping_mode == nil then
             intercropping_mode = 1
         end
 
@@ -382,7 +540,7 @@ AddComponentPostInit(
             controller_autoplanting = _controller_autoplanting
         end
 
-        self.inst.components.snaptiller.snapmode = snapmode
+        self.inst.components.snaptiller.snap_mode = snap_mode
         self.inst.components.snaptiller.intercropping_mode = intercropping_mode
         self.inst.components.snaptiller.isquagmire = isquagmire
 
@@ -418,12 +576,9 @@ AddComponentPostInit(
 
             local act = self:GetRightMouseAction()
 
-            if _G.ThePlayer.components.snaptiller.snapmode ~= 0 and act then
+            if _G.ThePlayer.components.snaptiller.snap_mode ~= 0 then
                 -- Wormwood planting
-                if
-                    act.action == _G.ACTIONS.DEPLOY and act.invobject:HasTag("deployedfarmplant") and
-                        not is_on_geometricplacement
-                 then
+                if isPlantingAtPoint(self, act) then
                     -- 250318 VanCa: only process mouse-up event to prevent double process per click
                     -- and compatible with ActionQueuer RB3
                     if not down then
@@ -434,15 +589,29 @@ AddComponentPostInit(
                             -- Single right click
                             local playercontroller = self.inst.components.playercontroller
                             local pos = self.inst.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
-                            local item = self.inst.replica.inventory and self.inst.replica.inventory:GetActiveItem()
-                            local act = _G.BufferedAction(self.inst, nil, _G.ACTIONS.DEPLOY, item, pos)
+                            -- Skip if can't plant at this snap
+                            if _G.TheWorld.Map:CanTillSoilAtPoint(pos.x, pos.y, pos.z, true) then
+                                local item = self.inst.replica.inventory and self.inst.replica.inventory:GetActiveItem()
+                                local act = _G.BufferedAction(self.inst, nil, _G.ACTIONS.DEPLOY, item, pos)
 
-                            if playercontroller.ismastersim then
-                                self.inst.components.combat:SetTarget(nil)
-                                playercontroller:DoAction(act)
-                            else
-                                if playercontroller.locomotor then
-                                    act.preview_cb = function()
+                                if playercontroller.ismastersim then
+                                    self.inst.components.combat:SetTarget(nil)
+                                    playercontroller:DoAction(act)
+                                else
+                                    if playercontroller.locomotor then
+                                        act.preview_cb = function()
+                                            _G.SendRPCToServer(
+                                                _G.RPC.RightClick,
+                                                _G.ACTIONS.DEPLOY.code,
+                                                pos.x,
+                                                pos.z,
+                                                nil,
+                                                nil,
+                                                true
+                                            )
+                                        end
+                                        playercontroller:DoAction(act)
+                                    else
                                         _G.SendRPCToServer(
                                             _G.RPC.RightClick,
                                             _G.ACTIONS.DEPLOY.code,
@@ -453,17 +622,6 @@ AddComponentPostInit(
                                             true
                                         )
                                     end
-                                    playercontroller:DoAction(act)
-                                else
-                                    _G.SendRPCToServer(
-                                        _G.RPC.RightClick,
-                                        _G.ACTIONS.DEPLOY.code,
-                                        pos.x,
-                                        pos.z,
-                                        nil,
-                                        nil,
-                                        true
-                                    )
                                 end
                             end
                         end
@@ -472,7 +630,7 @@ AddComponentPostInit(
                 end
 
                 -- Tilling
-                if act.action == _G.ACTIONS.TILL and (not _G.ACTIONS.TILL.tile_placer or not is_on_geometricplacement) then
+                if isTillingAtPoint(self) then
                     -- 250318 VanCa: only process mouse-up event to prevent double process per click
                     -- and compatible with ActionQueuer RB3
                     if not down then
@@ -483,17 +641,31 @@ AddComponentPostInit(
                             -- Single right click
                             local playercontroller = self.inst.components.playercontroller
                             local pos = self.inst.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
-                            local item =
-                                self.inst.replica.inventory and
-                                self.inst.replica.inventory:GetEquippedItem(_G.EQUIPSLOTS.HANDS)
-                            local act = _G.BufferedAction(self.inst, nil, _G.ACTIONS.TILL, item, pos)
+                            -- Skip if this snap is already tilled
+                            if self.inst.components.snaptiller:isValidSnap({pos.x, pos.z}) then
+                                local item =
+                                    self.inst.replica.inventory and
+                                    self.inst.replica.inventory:GetEquippedItem(_G.EQUIPSLOTS.HANDS)
+                                local act = _G.BufferedAction(self.inst, nil, _G.ACTIONS.TILL, item, pos)
 
-                            if playercontroller.ismastersim then
-                                self.inst.components.combat:SetTarget(nil)
-                                playercontroller:DoAction(act)
-                            else
-                                if playercontroller.locomotor then
-                                    act.preview_cb = function()
+                                if playercontroller.ismastersim then
+                                    self.inst.components.combat:SetTarget(nil)
+                                    playercontroller:DoAction(act)
+                                else
+                                    if playercontroller.locomotor then
+                                        act.preview_cb = function()
+                                            _G.SendRPCToServer(
+                                                _G.RPC.RightClick,
+                                                _G.ACTIONS.TILL.code,
+                                                pos.x,
+                                                pos.z,
+                                                nil,
+                                                nil,
+                                                true
+                                            )
+                                        end
+                                        playercontroller:DoAction(act)
+                                    else
                                         _G.SendRPCToServer(
                                             _G.RPC.RightClick,
                                             _G.ACTIONS.TILL.code,
@@ -504,17 +676,6 @@ AddComponentPostInit(
                                             true
                                         )
                                     end
-                                    playercontroller:DoAction(act)
-                                else
-                                    _G.SendRPCToServer(
-                                        _G.RPC.RightClick,
-                                        _G.ACTIONS.TILL.code,
-                                        pos.x,
-                                        pos.z,
-                                        nil,
-                                        nil,
-                                        true
-                                    )
                                 end
                             end
                         end
@@ -531,7 +692,7 @@ AddComponentPostInit(
         self.DoControllerAltActionButton = function(self)
             local _, act = self:GetGroundUseAction()
 
-            if _G.ThePlayer.components.snaptiller.snapmode ~= 0 and act then
+            if _G.ThePlayer.components.snaptiller.snap_mode ~= 0 and act then
                 if
                     act.action == _G.ACTIONS.TILL and act.pos and
                         (not _G.ACTIONS.TILL.tile_placer or not is_on_geometricplacement)
@@ -650,7 +811,7 @@ AddClassPostConstruct(
         self.CanDeploy = function(self, pt, ...)
             -- ACTIONS.DEPLOY.stroverridefn does not use intensive checks, so do the same here
             if
-                self.inst:HasTag("deployedfarmplant") and _G.ThePlayer.components.snaptiller.snapmode ~= 0 and
+                self.inst:HasTag("deployedfarmplant") and _G.ThePlayer.components.snaptiller.snap_mode ~= 0 and
                     not is_on_geometricplacement
              then
                 pt = _G.ThePlayer.components.snaptiller:GetSnap(pt)

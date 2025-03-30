@@ -1,45 +1,7 @@
 -- 250317 VanCa: Add this file to manage tilling / planting on multi tiles
 -- Reference: Action Queue RB3, Bird Painting Scroll
 
-function table_print(tt, indent, done)
-    done = done or {}
-    indent = indent or 0
-    if type(tt) == "table" then
-        local sb = {}
-        for key, value in pairs(tt) do
-            table.insert(sb, string.rep(" ", indent)) -- indent it
-            if "number" == type(key) then
-                table.insert(sb, string.format('%d: "%s" (%s)\n', key, tostring(value), type(value)))
-            else
-                table.insert(sb, string.format('%s = "%s" (%s)\n', tostring(key), tostring(value), type(value)))
-            end
-        end
-        return table.concat(sb)
-    else
-        return tt .. "(type: " .. type(tt) .. ")\n"
-    end
-end
-
-function to_string(tbl)
-    if "nil" == type(tbl) then
-        return tostring(nil)
-    elseif "table" == type(tbl) then
-        return "\n" .. table_print(tbl) .. "\n"
-    elseif "string" == type(tbl) then
-        return tbl
-    else
-        return tostring(tbl) .. "(" .. type(tbl) .. ")"
-    end
-end
-DebugPrint = false and function(...)
-    local msg = "[Snap tillss]"
-    for i = 1, arg.n do
-        msg = msg .. " " .. to_string(arg[i])
-    end
-    print(msg .. "\n")
-end or function()
-        --[[disabled]]
-    end
+local DebugPrint = _G.SnappingTills.DebugPrint
 
 local QueueManager =
     Class(
