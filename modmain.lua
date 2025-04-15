@@ -439,7 +439,7 @@ AddComponentPostInit(
             local snap_mode = _G.ThePlayer.components.snaptiller.snap_mode
             if
                 self.inst.prefab == "seeds_placer" and snap_mode > 0 and not is_on_geometricplacement and
-                    not _G.TheInput:ControllerAttached()
+                    not _G.TheInput:ControllerAttached() and self.invobject and self.invobject:HasTag("deployedfarmplant")
              then
                 local is_deploying_seeds = _G.ThePlayer.components.snaptillplacer.deployed_farm_plant
                 if not is_deploying_seeds then

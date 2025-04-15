@@ -674,6 +674,38 @@ end
 function SnapTiller:GetSlotFromAll(allowed_prefabs, tags_required, validate_func, order)
     return self:GetSlotsFromAll(allowed_prefabs, tags_required, validate_func, order)[1]
 end
+-- Pick up a certain item
+function SnapTiller:TakeActiveItemFromAllOfSlot(cont, slot, item_data)
+    local count = 0
+    while self.inst.replica.inventory:GetActiveItem() do
+        if count % 5 == 0 then
+            self.inst.replica.inventory:ReturnActiveItem()
+        else
+            -- Short wait
+            Sleep(FRAMES * 3)
+            DebugPrint("ReturnActiveItem short wait: ", count - math.floor(count / 5))
+        end
+        count = count + 1
+    end
+    local container = self:GetContainer(cont)
+    if container then
+        count = 0
+        repeat
+            if count % 5 == 0 then
+                if type(slot) == "number" then
+                    container:TakeActiveItemFromAllOfSlot(slot)
+                else
+                    container:TakeActiveItemFromEquipSlot(slot)
+                end
+            else
+                -- Short wait
+                Sleep(FRAMES * 3)
+                DebugPrint("TakeActiveItem short wait: ", count - math.floor(count / 5))
+            end
+            count = count + 1
+        until not item_data or self.inst.replica.inventory:GetActiveItem() == item_data.item
+    end
+end
 
 -- 2500321 VanCa: Add functions to Auto get new stack of seeds when planting with Wormwood
 function SnapTiller:GetNewActiveItem(allowed_prefabs, tags_required, validate_func, order)
@@ -691,31 +723,11 @@ function SnapTiller:GetNewActiveItem(allowed_prefabs, tags_required, validate_fu
     local item_data = self:GetSlotFromAll(allowed_prefabs, tags_required, validate_func, order)
     if item_data then
         DebugPrint("item_data:", item_data)
-        local container = self:GetContainer(item_data.cont)
-        repeat
-            container:TakeActiveItemFromAllOfSlot(item_data.slot)
-            Sleep(FRAMES * 3)
-        until invent:GetActiveItem() == item_data.item
+        self:TakeActiveItemFromAllOfSlot(item_data.cont, item_data.slot, item_data)
         DebugPrint("GetNewActiveItem - Done")
         return item_data.item
     end
-
-    -- If we didn't find the required item
-    if allowed_prefabs and table.contains(allowed_prefabs, "goldcoin") and goldenpiggy_data then
-        -- in case the required item was "goldcoin", try to find a goldenpiggy and withdraw from it
-        local goldenpiggy_data = self:GetSlotFromAll("goldenpiggy")
-        if goldenpiggy_data then
-            invent:UseItemFromInvTile(goldenpiggy_data.item)
-        end
-
-        -- long wait
-        Sleep(self.work_delay)
-        repeat
-            Sleep(self.action_delay)
-        until not (self.inst.sg and self.inst.sg:HasStateTag("moving")) and not self.inst:HasTag("moving") and
-            self.inst:HasTag("idle") and
-            not self.inst.components.playercontroller:IsDoingOrWorking()
-    end
+    DebugPrint("Can't GetNewActiveItem")
 end
 
 -- 250330 VanCa: removed intercropping_mode 1 (off): max (snap_count) plants per tile
