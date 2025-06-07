@@ -1,7 +1,7 @@
 -- 250324 VanCa: Integrate KeyBind UI by 李皓奇
 -- https://github.com/liolok/DST-KeyBind-UI
 
-version = "1.1.9_08"
+version = "1.1.9_09"
 name = "Snapping tills A WHOLE FIELD v" .. version
 description =
     [[Aligns plowing to the grid.
