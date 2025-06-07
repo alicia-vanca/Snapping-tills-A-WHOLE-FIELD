@@ -45,7 +45,8 @@ end
 -- reference: 呼吸
 function QueueManager:AddAdjacentFarmTiles(init_tile, target_pos)
     DebugPrint("-------------------------------------")
-    DebugPrint("AddAdjacentFarmTiles: init_tile:", tostring(init_tile), "target_pos:", target_pos)
+    -- DebugPrint("AddAdjacentFarmTiles: init_tile:", tostring(init_tile), "target_pos:", target_pos)
+    DebugPrint("AddAdjacentFarmTiles: target_pos:", target_pos)
     if target_pos then
         if not TheWorld.Map:IsFarmableSoilAtPoint(target_pos.x, 0, target_pos.z) then
             --DebugPrint("Not a farm tile")
@@ -147,7 +148,8 @@ end
 -- Select nearby non-farm tiles that in the SEARCH_RANGE of the "center_tile"
 function QueueManager:AddAdjacentNonFarmTiles(center_tile, init_tile, target_pos)
     DebugPrint("-------------------------------------")
-    DebugPrint("AddAdjacentNonFarmTiles: init_tile:", tostring(init_tile), "target_pos:", target_pos)
+    -- DebugPrint("AddAdjacentNonFarmTiles: init_tile:", tostring(init_tile), "target_pos:", target_pos)
+    DebugPrint("AddAdjacentNonFarmTiles: target_pos:", target_pos)
     if target_pos then
         local SEARCH_RANGE = 10
 
