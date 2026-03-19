@@ -735,12 +735,25 @@ end
 -- intercropping_mode 2 (intercropping 2 types): max (snap_count / 2) plants per tile
 -- intercropping_mode 3 (intercropping 3 types): max (snap_count / 3) plants per tile
 -- and so on...
+-- 260315 VanCa: Added intercropping_mode 1 (off): max (snap_count) plants per tile
+-- intercropping_mode 2 (auto): max plants based on inventory first slots (max 4)
+-- intercropping_mode 3 (intercropping 2 types): max (snap_count / 2) plants per tile
+-- intercropping_mode 4 (intercropping 3 types): max (snap_count / 3) plants per tile
 function SnapTiller:GetMaxIdenticalPlantsPerTile(snap_count, active_item)
     DebugPrint("-------------------------------------")
-    DebugPrint("GetMaxIdenticalPlantsPerTile")
-
-    if self.intercropping_mode > 1 or not active_item then
-        return math.floor(snap_count / self.intercropping_mode)
+    DebugPrint(
+        "GetMaxIdenticalPlantsPerTile",
+        "intercropping_mode:",
+        self.intercropping_mode,
+        "snap_count:",
+        snap_count,
+        "active_item:",
+        tostring(active_item)
+    )
+    if self.intercropping_mode == 1 or not active_item then
+        return snap_count
+    elseif self.intercropping_mode > 2 or not active_item then
+        return math.floor(snap_count / (self.intercropping_mode - 1))
     end
 
     local active_prefab = active_item.prefab
@@ -752,9 +765,10 @@ function SnapTiller:GetMaxIdenticalPlantsPerTile(snap_count, active_item)
     local invent = self.inst.replica.inventory
     local body_items = invent:GetItems() or {}
 
-    DebugPrint("body_items ", body_items)
+    DebugPrint("body_items ", tostring(body_items))
     for i = 1, 4 do
         local item = body_items[i]
+        DebugPrint("i:", i, "item:", tostring(item))
         if not item or item:HasTag("deployedfarmplant") then
             if not item then
                 denominator = denominator + 1
@@ -771,6 +785,7 @@ function SnapTiller:GetMaxIdenticalPlantsPerTile(snap_count, active_item)
         end
     end
 
+    DebugPrint("denominator:", denominator, "empty_count:", empty_count, "same_prefab_count:", same_prefab_count)
     if (denominator == 0) or (empty_count + same_prefab_count == 0) then
         return snap_count
     end
@@ -792,8 +807,9 @@ function SnapTiller:StartAutoDeployTile(tile)
     local active_item = self.inst.replica.inventory and self.inst.replica.inventory:GetActiveItem()
 
     self.snaplistaction = self:GetSnapListOnTile(tilex, tiley, TheCamera.heading, active_item)
-	
+
     local maxIdenticalPlantsPerTile = self:GetMaxIdenticalPlantsPerTile(#self.snaplistaction, active_item)
+    DebugPrint("MaxIdenticalPlantsPerTile:", maxIdenticalPlantsPerTile)
 
     -- 250318 VanCa: Removed this part to plant in narrowed spaces with Wormwood
     -- for i = #self.snaplistaction, 1, -1 do
@@ -810,7 +826,6 @@ function SnapTiller:StartAutoDeployTile(tile)
 
     -- if flagremove then table.remove(self.snaplistaction, i) end
     -- end
-
 
     while self.inst:IsValid() and active_item and
         CountPlantedSeedOnTile(self, target_pos, active_item.prefab) < maxIdenticalPlantsPerTile do

@@ -66,7 +66,7 @@ function to_string(tbl)
     return tostring(tbl) .. " (" .. type(tbl) .. ")"
 end
 
-local DebugPrint = false and function(...)
+local DebugPrint = true and function(...)
         local msg = "[SnappingTills]"
         for i = 1, arg.n do
             msg = msg .. " " .. to_string(arg[i])
@@ -103,11 +103,11 @@ _G.STRINGS.SNAPPINGTILLS = {
     SNAP_MODE_HEXAGON = "Snapping tills: mode hexagon",
     ACTION_CHANGE_INTERCROPPING_MODE = "Toggle intercropping mode",
     INTERCROPPING = {
-        [1] = "Intercropping: Inventory based",
-        -- [1] = "Intercropping: Off",
-        [2] = "Intercropping: 2 types",
-        [3] = "Intercropping: 3 types",
-        [4] = "Intercropping: 4 types"
+        [1] = "Intercropping: Off",
+        [2] = "Intercropping: Inventory based",
+        [3] = "Intercropping: 2 types",
+        [4] = "Intercropping: 3 types",
+        [5] = "Intercropping: 4 types"
     }
 }
 
@@ -142,11 +142,11 @@ if _G.TUNING.SNAPPINGTILLS.LANGUAGE == "sch" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "犁地模式: 六边形(1田10坑)"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "切换间作模式"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
-        [1] = "间作模式：基于物品栏",
-        -- [1] = "间作模式：关闭",
-        [2] = "间作模式：2 种",
-        [3] = "间作模式：3 种",
-        [4] = "间作模式：4 种"
+        [1] = "间作模式：关闭",
+        [2] = "间作模式：基于物品栏",
+        [3] = "间作模式：2 种",
+        [4] = "间作模式：3 种",
+        [5] = "间作模式：4 种"
     }
 elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "ru" then
     -- Russian
@@ -162,11 +162,11 @@ elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "ru" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "Snapping tills: режим шестиугольный"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "Переключить совмещение"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
-        [1] = "Совмещение: По слотам инвентаря",
-        -- [1] = "Совмещение: Выкл",
-        [2] = "Совмещение: 2 вида",
-        [3] = "Совмещение: 3 вида",
-        [4] = "Совмещение: 4 вида"
+        [1] = "Совмещение: отключён",
+        [2] = "Совмещение: По слотам инвентаря",
+        [3] = "Совмещение: 2 вида",
+        [4] = "Совмещение: 3 вида",
+        [5] = "Совмещение: 4 вида"
     }
 elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "esp" then
     -- Español
@@ -182,11 +182,11 @@ elseif _G.TUNING.SNAPPINGTILLS.LANGUAGE == "esp" then
     _G.STRINGS.SNAPPINGTILLS.SNAP_MODE_HEXAGON = "Snapping tills: Hexagono"
     _G.STRINGS.SNAPPINGTILLS.ACTION_CHANGE_INTERCROPPING_MODE = "Alternar cultivo intercalado"
     _G.STRINGS.SNAPPINGTILLS.INTERCROPPING = {
-        [1] = "Cultivo intercalado: Basado en inventario",
-        -- [1] = "Cultivo intercalado: Desactivado",
-        [2] = "Cultivo intercalado: 2 tipos",
-        [3] = "Cultivo intercalado: 3 tipos",
-        [4] = "Cultivo intercalado: 4 tipos"
+        [1] = "Cultivo intercalado: Desactivado",
+        [2] = "Cultivo intercalado: Basado en inventario",
+        [3] = "Cultivo intercalado: 2 tipos",
+        [4] = "Cultivo intercalado: 3 tipos",
+        [5] = "Cultivo intercalado: 4 tipos"
     }
 end
 
@@ -336,14 +336,16 @@ end
 -- Get enabled intercropping modes from config
 local enabled_intercropping_modes = {}
 
-for mode = 1, 4 do
-    if mode == 1 and GetModConfigData("enable_auto_mode") then
+for mode = 1, 5 do
+    if mode == 1 and GetModConfigData("enable_off_intercropping_option") then
         table.insert(enabled_intercropping_modes, mode)
-    elseif mode == 2 and GetModConfigData("enable_2_types_mode") then
+    elseif mode == 2 and GetModConfigData("enable_auto_mode") then
         table.insert(enabled_intercropping_modes, mode)
-    elseif mode == 3 and GetModConfigData("enable_3_types_mode") then
+    elseif mode == 3 and GetModConfigData("enable_2_types_mode") then
         table.insert(enabled_intercropping_modes, mode)
-    elseif mode == 4 and GetModConfigData("enable_4_types_mode") then
+    elseif mode == 4 and GetModConfigData("enable_3_types_mode") then
+        table.insert(enabled_intercropping_modes, mode)
+    elseif mode == 5 and GetModConfigData("enable_4_types_mode") then
         table.insert(enabled_intercropping_modes, mode)
     end
 end
@@ -439,14 +441,19 @@ AddComponentPostInit(
             local snap_mode = _G.ThePlayer.components.snaptiller.snap_mode
             if
                 self.inst.prefab == "seeds_placer" and snap_mode > 0 and not is_on_geometricplacement and
-                    not _G.TheInput:ControllerAttached() and self.invobject and self.invobject:HasTag("deployedfarmplant")
+                    not _G.TheInput:ControllerAttached() and
+                    self.invobject and
+                    self.invobject:HasTag("deployedfarmplant")
              then
                 local is_deploying_seeds = _G.ThePlayer.components.snaptillplacer.deployed_farm_plant
                 if not is_deploying_seeds then
                     _G.ThePlayer.components.snaptillplacer.deployed_farm_plant = true
                     -- Say about current Intercropping mode when Wormwood pick up seeds with mouse
+                    -- Except when Intercropping mode is Off
                     local intercropping_mode = _G.ThePlayer.components.snaptiller.intercropping_mode
-                    _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(intercropping_mode))
+                    if intercropping_mode > 1 then
+                        _G.ThePlayer.components.talker:Say(GetIntercroppingModeString(intercropping_mode))
+                    end
                 end
                 local pos = _G.ThePlayer.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
                 self.inst.Transform:SetPosition(pos:Get())
@@ -540,7 +547,7 @@ AddComponentPostInit(
         self.inst.components.snaptiller.snap_mode = snap_mode
         self.inst.components.snaptiller.intercropping_mode = intercropping_mode
         self.inst.components.snaptiller.isquagmire = isquagmire
-	
+
         self.inst.components.snaptillplacer.visible_setting = visiblesnaps
 
         local original_OnControl = self.OnControl

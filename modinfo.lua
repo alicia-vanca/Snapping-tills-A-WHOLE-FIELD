@@ -1,7 +1,7 @@
 -- 250324 VanCa: Integrate KeyBind UI by 李皓奇
 -- https://github.com/liolok/DST-KeyBind-UI
 
-version = "1.1.9_09"
+version = "1.1.9_10"
 name = "Snapping tills A WHOLE FIELD v" .. version
 description =
     [[Aligns plowing to the grid.
@@ -205,9 +205,19 @@ configuration_options = {
     },
     addTitle("Intercropping modes"),
     {
+        name = "enable_off_intercropping_option",
+        label = 'Enable "Intercropping Off" option',
+        hover = 'Enable "Intercropping Off" option in rotation\nYou can disable this for simpler modes switching\nIf all modes are disabled, this will be the only available option when toggling',
+        options = {
+            {description = "Yes", data = true},
+            {description = "No", data = false}
+        },
+        default = true
+    },
+    {
         name = "enable_auto_mode",
         label = "Enable Auto mode",
-        hover = "Enable intercropping Auto mode (inventory-based) in rotation\nIf all modes are disabled, this will be the only available option when toggling",
+        hover = "Enable intercropping Auto mode (inventory-based) in rotation",
         options = {
             {description = "Yes", data = true},
             {description = "No", data = false}
