@@ -1,6 +1,7 @@
 -- 250321 VanCa: Add intercropping handling
-
 -- 250324 VanCa: Integrate KeyBind UI by 李皓奇
+-- 260617 VanCa: Add support for Heated Garden Hoe
+
 -- https://github.com/liolok/DST-KeyBind-UI
 modimport("keybind")
 
@@ -473,7 +474,8 @@ function isTillingAtPoint(self, act)
             equipped_item and
                 (equipped_item.prefab == "farm_hoe" or equipped_item.prefab == "golden_farm_hoe" or
                     equipped_item.prefab == "shovel_lunarplant" or
-                    equipped_item.prefab == "quagmire_hoe")
+                    equipped_item.prefab == "quagmire_hoe" or
+                    equipped_item.prefab == "fumarole_farm_hoe")
          then
             local pos = self.inst.components.snaptiller:GetSnap(_G.TheInput:GetWorldPosition())
             local is_farm_tile = false
@@ -831,7 +833,8 @@ local function IsHandSlotItemHoe(slot)
     return slot ~= nil and slot.equipslot == _G.EQUIPSLOTS.HANDS and slot.tile ~= nil and slot.tile.item ~= nil and
         (slot.tile.item.prefab == "farm_hoe" or slot.tile.item.prefab == "golden_farm_hoe" or
             slot.tile.item.prefab == "shovel_lunarplant" or
-            slot.tile.item.prefab == "quagmire_hoe")
+            slot.tile.item.prefab == "quagmire_hoe" or
+            slot.tile.item.prefab == "fumarole_farm_hoe")
 end
 
 local function IsSlotItemSeeds(slot)
