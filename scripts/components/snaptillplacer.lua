@@ -94,7 +94,8 @@ function SnapTillPlacer:OnUpdate(dt)
                 not equippeditem or
                     (equippeditem and equippeditem.prefab ~= "farm_hoe" and equippeditem.prefab ~= "golden_farm_hoe" and
                         equippeditem.prefab ~= "shovel_lunarplant" and
-                        equippeditem.prefab ~= "quagmire_hoe")
+                        equippeditem.prefab ~= "quagmire_hoe" and
+                        equippeditem.prefab ~= "fumarole_farm_hoe")
              then
                 self:ClearLinked()
                 return
